@@ -1,0 +1,15 @@
+{
+  "name": "Habitico",
+  "short_name": "Habitico",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f5fb",
+  "theme_color": "#f4f5fb",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
