@@ -5245,6 +5245,9 @@
             </div>
           </div>
 
+          <!-- تنويه أيام الراحة (Off) في الأسبوع إن وجدت -->
+          <div id="weeklyOffDaysNoticeBox"></div>
+
           <!-- ميزان حرارة حمل الأسبوع + إعادة التوازن في منتصف الأسبوع -->
           <div id="weeklyLoadThermometerBox"></div>
           <div id="midWeekRebalanceBox"></div>
@@ -8259,9 +8262,9 @@
           if (idx !== -1) state.rewardsTiers[targetTier].splice(idx, 1);
         }
 
-        mj.hoursUsed = Math.round((mj.hoursUsed + realDurationHours) * 10) / 10;
+        mj.hoursUsed = Math.round((mj.hoursUsed + realDurationHours) * 100) / 100;
         if (!mj.tierHoursUsed) mj.tierHoursUsed = { tier1: 0, tier2: 0, tier3: 0, tier4: 0 };
-        mj.tierHoursUsed[targetTier] = Math.round(((mj.tierHoursUsed[targetTier] || 0) + realDurationHours) * 10) / 10;
+        mj.tierHoursUsed[targetTier] = Math.round(((mj.tierHoursUsed[targetTier] || 0) + realDurationHours) * 100) / 100;
 
         // عرض اسم المكافأة مع رقم الحلقة التالي ثم زيادته تلقائياً (للمكررة فقط)
         const displayTitle = formatRewardDisplayTitle(pickedReward);
@@ -18857,36 +18860,47 @@
       };
     }
 
-    function tbGetWeekAvailabilityBreakdown(weekSundayYMD, fromDateYMD = null) {
+    function tbGetWeekAvailabilityBreakdown(weekSundayYMD, fromDateYMD = null, excludedDayOffsets = null) {
       const startDay = fromDateYMD && fromDateYMD > weekSundayYMD ? fromDateYMD : weekSundayYMD;
       const satYMD = addDays(weekSundayYMD, 6);
+      const offSet = new Set(Array.isArray(excludedDayOffsets) ? excludedDayOffsets.map(Number) : []);
       let rawWeekMin = 0;
       let obWeekMin = 0;
       let netWeekMin = 0;
       let buffer25WeekMin = 0;
       let netWeek75Min = 0;
       const dayBreakdowns = [];
+      const allDayBreakdowns = [];
       for (let d = startDay; diffDays(d, satYMD) >= 0; d = addDays(d, 1)) {
+        const dayIdx = diffDays(weekSundayYMD, d);
         const info = tbGetDayAvailabilityBreakdown(d);
-        rawWeekMin += info.rawMinutes;
-        obWeekMin += info.obligationOverlapMinutes;
-        netWeekMin += info.netMinutes;
-        buffer25WeekMin += info.buffer25Minutes;
-        netWeek75Min += info.net75Minutes;
-        dayBreakdowns.push(info);
+        const isOff = offSet.has(dayIdx);
+        const enriched = Object.assign({}, info, { dayIdx, isOff });
+        allDayBreakdowns.push(enriched);
+        if (!isOff) {
+          rawWeekMin += info.rawMinutes;
+          obWeekMin += info.obligationOverlapMinutes;
+          netWeekMin += info.netMinutes;
+          buffer25WeekMin += info.buffer25Minutes;
+          netWeek75Min += info.net75Minutes;
+          dayBreakdowns.push(enriched);
+        }
       }
       return {
         weekSunday: weekSundayYMD,
         fromDate: startDay,
         toDate: satYMD,
         daysCount: dayBreakdowns.length,
+        totalRangeDaysCount: allDayBreakdowns.length,
+        offDaysInWindowCount: allDayBreakdowns.length - dayBreakdowns.length,
         rawWeekMinutes: rawWeekMin,
         obligationOverlapMinutes: obWeekMin,
         netWeekMinutes: netWeekMin,
         buffer25WeekMinutes: buffer25WeekMin,
         netWeek75Minutes: netWeek75Min,
         netWeekAfter15BufferMinutes: Math.round(netWeekMin * 0.85),
-        dayBreakdowns
+        dayBreakdowns,
+        allDayBreakdowns
       };
     }
 
@@ -19303,11 +19317,20 @@
     function checkAndRollWeeklyQuotaJackpot(q, targetDayYMD) {
       if (!q) return { dailyRolled: false, weeklyRolled: false };
       checkMonthlyJackpotCycle();
-      const dayYMD = targetDayYMD || getSystemTodayYMD();
+      const sysToday = getSystemTodayYMD();
+      const curWeekSun = getWeekSundayYMD(sysToday);
+      const dayYMD = targetDayYMD || sysToday;
       const weekSun = getWeekSundayYMD(dayYMD);
+
+      // حماية الخوارزمية 1: منع السحب بأثر رجعي لأسابيع ماضية أو أيام مستقبلية خارج الأسبوع الجاري
+      if (weekSun !== curWeekSun || dayYMD > sysToday) {
+        return { dailyRolled: false, weeklyRolled: false };
+      }
+
       const qStars = Math.min(4, Math.max(1, Number(q.stars) || 3));
-      const dailyTarget = Math.max(1, Number(q.dailyAvgMinutes) || 0);
-      const weeklyNetTarget = getWeeklyQuotaNetTargetMinutes(q);
+      // حماية الخوارزمية 2: حد أدنى منطقي للهدف اليومي والأسبوعي يمنع فتح الرميات بأهداف وهمية
+      const dailyTarget = Math.max(5, Number(q.dailyAvgMinutes) || 0);
+      const weeklyNetTarget = Math.max(15, getWeeklyQuotaNetTargetMinutes(q));
       const dailyDone = getWeeklyQuotaDailyLoggedMinutes(q, dayYMD);
       const weeklyDone = getWeeklyQuotaLoggedMinutes(q, weekSun);
       const mj = state.monthlyJackpot || {};
@@ -19318,7 +19341,7 @@
 
       // 1. محطة الإنجاز اليومي (بنفس وزن المهام الأسبوعية 0.80 مقسماً على أيام الحصة الفعالة في الأسبوع)
       const dailyKey = 'quota_day:' + q.id + ':' + dayYMD;
-      if (dailyTarget > 0 && dailyDone >= dailyTarget && !rolled[dailyKey]) {
+      if (dailyDone >= dailyTarget && !rolled[dailyKey]) {
         const effectiveWeekDays = (q.buffer15 !== false) ? 6 : 7;
         rollDopamineJackpot('quota_daily', qStars, dailyKey, effectiveWeekDays);
         dailyRolled = true;
@@ -19326,7 +19349,7 @@
 
       // 2. محطة التتويج الأسبوعي 100% (رمية كاملة بوزن مهمة أسبوعية كاملة 0.80)
       const weeklyKey = 'quota_week:' + q.id + ':' + weekSun;
-      if (weeklyNetTarget > 0 && weeklyDone >= weeklyNetTarget && !(state.monthlyJackpot && state.monthlyJackpot.rolledKeys && state.monthlyJackpot.rolledKeys[weeklyKey])) {
+      if (weeklyDone >= weeklyNetTarget && !(state.monthlyJackpot && state.monthlyJackpot.rolledKeys && state.monthlyJackpot.rolledKeys[weeklyKey])) {
         rollDopamineJackpot('quota_weekly', qStars, weeklyKey);
         weeklyRolled = true;
       }
@@ -19576,6 +19599,8 @@
       if (cfg.advisorRealismMode !== 'auto') cfg.advisorRealismMode = 'off';           // معامل الواقعية
       if (!Number.isFinite(Number(cfg.advisorReservePct))) cfg.advisorReservePct = 0;  // يوم الاحتياط (%)
       if (!cfg.advisorCategoryMeta || typeof cfg.advisorCategoryMeta !== 'object') cfg.advisorCategoryMeta = {};
+      if (!cfg.advisorOffDaysByWeek || typeof cfg.advisorOffDaysByWeek !== 'object') cfg.advisorOffDaysByWeek = {};
+      if (!cfg.advisorPlanStartByWeek || typeof cfg.advisorPlanStartByWeek !== 'object') cfg.advisorPlanStartByWeek = {};
       return cfg;
     }
 
@@ -20012,10 +20037,48 @@
       return Math.max(0, catAllocatedMin - offPlanMin);
     }
 
+    function getAdvisorOffDaysForWeek(weekSundayYMD) {
+      const cfg = ensurePlanningAnalyticsConfig();
+      const list = cfg.advisorOffDaysByWeek && Array.isArray(cfg.advisorOffDaysByWeek[weekSundayYMD])
+        ? cfg.advisorOffDaysByWeek[weekSundayYMD]
+        : [];
+      return [...new Set(list.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 6))].sort((a, b) => a - b);
+    }
+
+    function toggleAdvisorOffDayForWeek(weekSundayYMD, dayIdx) {
+      const cfg = ensurePlanningAnalyticsConfig();
+      const idx = Number(dayIdx);
+      if (!Number.isInteger(idx) || idx < 0 || idx > 6) return;
+      const cur = getAdvisorOffDaysForWeek(weekSundayYMD);
+      const pos = cur.indexOf(idx);
+      if (pos >= 0) cur.splice(pos, 1);
+      else cur.push(idx);
+      cur.sort((a, b) => a - b);
+      if (cur.length === 0) delete cfg.advisorOffDaysByWeek[weekSundayYMD];
+      else cfg.advisorOffDaysByWeek[weekSundayYMD] = cur;
+      saveState();
+      renderWeeklyPlanAdvisorModalBody();
+      renderAdvisorStudioPage();
+      renderStudyTasksView();
+    }
+
+    function clearAdvisorOffDaysForWeek(weekSundayYMD) {
+      const cfg = ensurePlanningAnalyticsConfig();
+      if (cfg.advisorOffDaysByWeek && cfg.advisorOffDaysByWeek[weekSundayYMD]) {
+        delete cfg.advisorOffDaysByWeek[weekSundayYMD];
+        saveState();
+        renderWeeklyPlanAdvisorModalBody();
+        renderAdvisorStudioPage();
+        renderStudyTasksView();
+        showAppToast('✅ تم إلغاء أيام الراحة (Off) وإرجاع جميع أيام الأسبوع لخطة المذاكرة.');
+      }
+    }
+
     function computeWeekNetStudyBudget(weekSundayYMD, fromDateYMD = null) {
       const cfg = ensurePlanningAnalyticsConfig();
       const quotas = ensureWeeklyFixedQuotas();
-      const tbWeek = tbGetWeekAvailabilityBreakdown(weekSundayYMD, fromDateYMD);
+      const offDays = getAdvisorOffDaysForWeek(weekSundayYMD);
+      const tbWeek = tbGetWeekAvailabilityBreakdown(weekSundayYMD, fromDateYMD, offDays);
       const daysRatio = tbWeek.daysCount / 7;
 
       const isManual = cfg.advisorHoursSource === 'manual';
@@ -20028,7 +20091,7 @@
         ? (cfg.advisorBuffer15 !== false ? Math.round(rawSourceMin * 0.85) : rawSourceMin)
         : rawSourceMin;
 
-      // إجمالي الحصص الثابتة (Anki والقرآن) للفترة المختارة
+      // إجمالي الحصص الأسبوعية الثابتة للفترة المختارة (بحسب الأيام النشطة فعلياً دون أيام الـ Off)
       let fullPeriodQuotasMin = 0;
       let remainingQuotasMin = 0;
       quotas.forEach(q => {
@@ -20037,17 +20100,17 @@
         fullPeriodQuotasMin += scaledForDays;
         const alreadyLogged = getWeeklyQuotaLoggedMinutes(q, weekSundayYMD);
         const unloggedWeekQuota = Math.max(0, fullQTarget - alreadyLogged);
-        if (fromDateYMD && fromDateYMD > weekSundayYMD) {
+        if ((fromDateYMD && fromDateYMD > weekSundayYMD) || offDays.length > 0) {
           remainingQuotasMin += Math.min(unloggedWeekQuota, scaledForDays);
         } else {
           remainingQuotasMin += scaledForDays;
         }
       });
 
-      const quotasDeductMin = (cfg.advisorIncludeQuotas !== false) ? remainingQuotasMin : 0;
+      const quotasDeductMin = (cfg.advisorIncludeQuotas !== false && tbWeek.daysCount > 0) ? remainingQuotasMin : 0;
       const netForTasksMin = Math.max(0, afterBufferMin - quotasDeductMin);
 
-      // [اقتراح 1 + 4] الوعاء الموصى به للمهام = الصافي × معامل الواقعية − يوم الاحتياط
+      // الوعاء الموصى به للمهام = الصافي × معامل الواقعية − يوم الاحتياط
       const realism = (cfg.advisorRealismMode === 'auto') ? computeRealismFactor() : { factor: 1, enough: false, weeks: [] };
       const appliedRealism = realism.enough ? realism.factor : 1;
       const reservePct = Math.max(0, Math.min(30, Number(cfg.advisorReservePct) || 0));
@@ -20060,6 +20123,7 @@
         reservePct,
         reserveMin,
         plannableForTasksMin,
+        offDays,
         tbWeek,
         isManual,
         rawSourceMin,
@@ -20304,24 +20368,58 @@
       const thermoBox = document.getElementById('weeklyLoadThermometerBox');
       const rebalanceBox = document.getElementById('midWeekRebalanceBox');
       const quotasBox = document.getElementById('weeklyFixedQuotasBox');
+      const offNoticeBox = document.getElementById('weeklyOffDaysNoticeBox');
 
       const bench = computeCategoryPlanningBenchmarks();
       const planStartForThermo = resolveAdvisorPlanStartDate(targetSun);
       const budget = computeWeekNetStudyBudget(targetSun, planStartForThermo);
       const weekTasks = (state.studyTasks || []).filter(t => t && t.weekSunday === targetSun && !(['st_1', 'st_2', 'st_3', 'st_4'].includes(t.id) && !t.done));
 
+      // 0. تنويه صغير وبسيط لأيام الراحة (Off) المحددة في هذا الأسبوع مع إمكانية الإلغاء أو التعديل السريع
+      if (offNoticeBox) {
+        const offDaysArr = budget.offDays || [];
+        const dayNamesArShort = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        if (offDaysArr.length > 0) {
+          const chipsHtml = offDaysArr.map(dIdx => `
+            <span style="display:inline-flex; align-items:center; gap:5px; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:2px 9px; font-size:0.75rem; font-weight:800; color:var(--text);">
+              <span>${dayNamesArShort[dIdx]}</span>
+              <button type="button" onclick="toggleAdvisorOffDayForWeek('${targetSun}', ${dIdx})" title="إلغاء الـ Off ليوم ${dayNamesArShort[dIdx]} وإرجاعه للخطة" style="border:none; background:none; color:var(--muted); cursor:pointer; font-size:0.78rem; padding:0 2px; line-height:1;">✕</button>
+            </span>
+          `).join('');
+          offNoticeBox.innerHTML = `
+            <div style="background:var(--surface-2); border:1px dashed var(--border); border-radius:12px; padding:8px 12px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:0.78rem; color:var(--muted);">
+                <span>🏖️ أيام راحة (Off) هذا الأسبوع:</span>
+                ${chipsHtml}
+              </div>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                ${offDaysArr.length > 1 ? `<button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:0.72rem;" onclick="clearAdvisorOffDaysForWeek('${targetSun}')">↺ إلغاء الكل</button>` : ''}
+                <button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:0.72rem;" onclick="switchTasksInnerSubPage('advisor')">🧭 تعديل في المستشار</button>
+              </div>
+            </div>
+          `;
+        } else {
+          offNoticeBox.innerHTML = '';
+        }
+      }
+
       // 1. ميزان حرارة حمل الأسبوع (الـ 100% تشمل الحصص الثابتة بالبني الفاتح + المهام الأسبوعية بالأخضر)
       if (thermoBox) {
         const totalPlannedTaskMin = filterTasksInsidePlanWindow(weekTasks, targetSun, planStartForThermo)
           .reduce((acc, t) => acc + estimateSingleTaskFullMinutes(t, bench.categories), 0);
         const quotasLoadMin = budget.quotasDeductMin;
-        const totalCapMin = Math.max(60, budget.afterBufferMin); // 100% من الطاقة الصافية المتاحة
+        const isZeroCap = budget.afterBufferMin <= 0;
+        const totalCapMin = isZeroCap ? 0 : budget.afterBufferMin; // 100% من الطاقة الصافية المتاحة
         const combinedLoadMin = quotasLoadMin + totalPlannedTaskMin;
 
-        // [إصلاح] تقريب بطريقة «أكبر باقي» بحيث (بني + أخضر + حر) = 100% تماماً عند عدم تجاوز السقف
+        // [إصلاح] تقريب بطريقة «أكبر باقي» بحيث (بني + أخضر + حر) = 100% تماماً عند عدم تجاوز السقف، مع حماية القسمة على صفر
         const _freeRaw = Math.max(0, totalCapMin - combinedLoadMin);
         let quotasPct, tasksPct, freePct;
-        if (combinedLoadMin <= totalCapMin) {
+        if (isZeroCap) {
+          quotasPct = 0;
+          tasksPct = combinedLoadMin > 0 ? 100 : 0;
+          freePct = 0;
+        } else if (combinedLoadMin <= totalCapMin) {
           const raws = [quotasLoadMin, totalPlannedTaskMin, _freeRaw].map(v => (v / totalCapMin) * 100);
           const floors = raws.map(Math.floor);
           let rest = 100 - floors.reduce((a, b) => a + b, 0);
@@ -20529,7 +20627,10 @@
       const sysToday = getSystemTodayYMD();
       const curSun = getWeekSundayYMD(sysToday);
       const isCurrentWeek = (targetSun === curSun);
-      const offsetVal = cfg.advisorPlanStartDayOffset;
+      const hasPerWeek = cfg.advisorPlanStartByWeek && Object.prototype.hasOwnProperty.call(cfg.advisorPlanStartByWeek, targetSun);
+      const offsetVal = hasPerWeek
+        ? cfg.advisorPlanStartByWeek[targetSun]
+        : (isCurrentWeek ? cfg.advisorPlanStartDayOffset : 0);
 
       if (typeof offsetVal === 'number' && offsetVal >= 0 && offsetVal <= 6) {
         return addDays(targetSun, offsetVal);
@@ -20548,9 +20649,13 @@
       return sysToday >= targetSun && sysToday <= addDays(targetSun, 6) ? sysToday : targetSun;
     }
 
-    function setAdvisorPlanStartDayOffset(offsetKeyOrNum) {
+    function setAdvisorPlanStartDayOffset(offsetKeyOrNum, targetSunOverride = null) {
       const cfg = ensurePlanningAnalyticsConfig();
-      cfg.advisorPlanStartDayOffset = offsetKeyOrNum;
+      const targetSun = targetSunOverride || getActiveTasksWeekSunday();
+      cfg.advisorPlanStartByWeek[targetSun] = offsetKeyOrNum;
+      if (targetSun === getWeekSundayYMD(getSystemTodayYMD())) {
+        cfg.advisorPlanStartDayOffset = offsetKeyOrNum;
+      }
       saveState();
       renderWeeklyPlanAdvisorModalBody();
       renderAdvisorStudioPage();
@@ -20999,7 +21104,24 @@ ${plan.leftoverSurplusMin >= 15 ? `
         let badgeTxt = dayNamesAr[dIdx];
         if (isTodayBtn) badgeTxt += ' (اليوم)';
         else if (isTomBtn) badgeTxt += ' (بكرة)';
-        return `<button type="button" class="cat-quick-chip ${isSel ? 'active' : ''}" style="font-size:0.74rem; padding:4px 10px;" onclick="setAdvisorPlanStartDayOffset(${dIdx})">${badgeTxt}</button>`;
+        return `<button type="button" class="cat-quick-chip ${isSel ? 'active' : ''}" style="font-size:0.74rem; padding:4px 10px;" onclick="setAdvisorPlanStartDayOffset(${dIdx}, '${targetSun}')">${badgeTxt}</button>`;
+      }).join('');
+
+      const offDaysInWeek = budget.offDays || [];
+      const activeDaysPickerHtml = (budget.tbWeek.allDayBreakdowns || []).map(dInfo => {
+        const dIdx = dInfo.dayIdx;
+        const isOff = dInfo.isOff;
+        const dayHrsTxt = cfg.advisorHoursSource === 'manual'
+          ? fmtMinutesAr(Math.round((Number(cfg.advisorManualDailyHours) || 6) * 60 * (cfg.advisorBuffer15 !== false ? 0.85 : 1)))
+          : fmtMinutesAr(dInfo.net75Minutes);
+        return `
+          <button type="button" onclick="toggleAdvisorOffDayForWeek('${targetSun}', ${dIdx})"
+            style="display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding:6px 10px; border-radius:11px; cursor:pointer; font-family:inherit; transition:all 0.15s ease; border:1.5px solid ${isOff ? 'var(--border)' : 'var(--green)'}; background:${isOff ? 'var(--surface)' : 'rgba(16,185,129,0.10)'}; color:${isOff ? 'var(--muted)' : 'var(--green-ink)'}; opacity:${isOff ? '0.78' : '1'};"
+            title="${isOff ? 'اضغط لإرجاع هذا اليوم لخطة المذاكرة' : 'اضغط لاستبعاد هذا اليوم كإجازة (Off)'}">
+            <span style="font-size:0.77rem; font-weight:900; ${isOff ? 'text-decoration:line-through;' : ''}">${isOff ? '🏖️ ' : '✅ '}${dayNamesAr[dIdx]}</span>
+            <span style="font-size:0.68rem; font-weight:800;">${isOff ? 'Off' : dayHrsTxt}</span>
+          </button>
+        `;
       }).join('');
 
       const carryList = getCarryOverCandidates(targetSun);
@@ -21027,16 +21149,27 @@ ${plan.leftoverSurplusMin >= 15 ? `
           <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin-bottom:12px;">
             <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--border);">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
-                <span style="font-weight:900; font-size:0.86rem; color:var(--text);">📅 متى تريد أن تبدأ الخطة في هذا الأسبوع؟ (من ${startDayName} ${planStartDateYMD} إلى السبت ${satYMD} = ${budget.tbWeek.daysCount} أيام):</span>
+                <span style="font-weight:900; font-size:0.86rem; color:var(--text);">📅 متى تريد أن تبدأ التنفيذ والمذاكرة؟ (من ${startDayName} ${planStartDateYMD} إلى السبت ${satYMD}):</span>
                 ${!isNext ? `
                   <div style="display:flex; gap:5px;">
-                    <button type="button" class="btn btn-sm ${planStartDateYMD === sysToday ? 'btn-primary' : 'btn-outline'}" style="padding:2px 9px; font-size:0.72rem;" onclick="setAdvisorPlanStartDayOffset('today')">⚡ من اليوم</button>
-                    <button type="button" class="btn btn-sm ${planStartDateYMD === addDays(sysToday, 1) ? 'btn-primary' : 'btn-outline'}" style="padding:2px 9px; font-size:0.72rem;" onclick="setAdvisorPlanStartDayOffset('tomorrow')">🌅 من بكرة</button>
+                    <button type="button" class="btn btn-sm ${planStartDateYMD === sysToday ? 'btn-primary' : 'btn-outline'}" style="padding:2px 9px; font-size:0.72rem;" onclick="setAdvisorPlanStartDayOffset('today', '${targetSun}')">⚡ من اليوم</button>
+                    <button type="button" class="btn btn-sm ${planStartDateYMD === addDays(sysToday, 1) ? 'btn-primary' : 'btn-outline'}" style="padding:2px 9px; font-size:0.72rem;" onclick="setAdvisorPlanStartDayOffset('tomorrow', '${targetSun}')">🌅 من بكرة</button>
                   </div>
                 ` : ''}
               </div>
-              <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
                 ${weekDaysPickerHtml}
+              </div>
+
+              <div style="padding-top:8px; border-top:1px dotted var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+                  <span style="font-weight:900; font-size:0.82rem; color:var(--text);">📆 أيام المذاكرة في هذه الخطة (<strong>${budget.tbWeek.daysCount}</strong> من ${budget.tbWeek.totalRangeDaysCount} أيام — اضغط على أي يوم لجعله <strong>Off 🏖️</strong>):</span>
+                  ${offDaysInWeek.length > 0 ? `<button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:0.71rem;" onclick="clearAdvisorOffDaysForWeek('${targetSun}')">↺ إرجاع كل الأيام</button>` : ''}
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  ${activeDaysPickerHtml}
+                </div>
+                ${budget.tbWeek.daysCount === 0 ? `<div class="hint" style="color:var(--red-ink); font-size:0.74rem; margin-top:6px; font-weight:800;">⚠️ كل الأيام المتبقية محددة كـ Off حالياً (0 ساعة متاحة) — اضغط على يوم واحد على الأقل لتفعيل التخطيط.</div>` : ''}
               </div>
             </div>
 
