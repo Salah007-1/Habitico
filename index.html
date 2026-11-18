@@ -9749,6 +9749,7 @@
           : [];
         t.done = true;
         t.completedAt = getSystemTodayYMD();
+        if (typeof syncCurriculumLessonFromTask === 'function') syncCurriculumLessonFromTask(t, true);
         playTaskCompleteCrunch();
         if (taskHasSteps(t)) {
           t.subSteps.forEach(s => setSubtreeDone(s, true));
@@ -9762,6 +9763,7 @@
       } else {
         t.done = false;
         t.completedAt = null;
+        if (typeof syncCurriculumLessonFromTask === 'function') syncCurriculumLessonFromTask(t, false);
         if (taskHasSteps(t)) t.subSteps.forEach(s => setSubtreeDone(s, false));
       }
       saveState();
@@ -11286,6 +11288,9 @@
       const preservedCatTypesConfig = (src.categoryTaskTypesConfig && typeof src.categoryTaskTypesConfig === 'object')
         ? JSON.parse(JSON.stringify(src.categoryTaskTypesConfig))
         : undefined;
+      const preservedMedicalCurriculum = (src.medicalCurriculum && typeof src.medicalCurriculum === 'object')
+        ? JSON.parse(JSON.stringify(src.medicalCurriculum))
+        : {};
 
       // 3-ب. الاحتفاظ بتاب توزيع الوقت (Time Blocking) والالتزامات والتذكيرات كما هي 100% دون أي مساس
       const preservedTimeBlocking = (src.timeBlocking && typeof src.timeBlocking === 'object')
@@ -11449,6 +11454,7 @@
         weeklyFixedQuotas: preservedWeeklyQuotas,
         planningAnalyticsConfig: preservedPlanningConfig,
         categoryTaskTypesConfig: preservedCatTypesConfig,
+        medicalCurriculum: preservedMedicalCurriculum,
         planningCalibrationStartDate: sysToday,
         studyTasks: preservedStudyTasks,
         habitsV2: cleanHabitsV2,
@@ -13650,6 +13656,15 @@
       if (k === 'cat') {
         return `📂 ${getTaskCategoryEmoji(id)} ${id} (التصنيف كامل)`;
       }
+      if (k === 'cat_ch_type') {
+        const parts = id.split('::');
+        const cName = parts[0] || 'عام';
+        const chId = parts[1] || '';
+        const tpId = parts[2] || '';
+        const tpObj = getTaskTypeObj(cName, tpId);
+        const chObj = (typeof getCurriculumChapterById === 'function') ? getCurriculumChapterById(cName, chId) : null;
+        return `${tpObj.emoji || '📖'} ${cName}${chObj ? ' • ' + chObj.name : ''} — ${tpObj.name}`;
+      }
       if (k === 'cat_type') {
         const sep = id.lastIndexOf(':');
         const cName = sep >= 0 ? id.slice(0, sep) : id;
@@ -13776,12 +13791,14 @@
         const cVal = `cat:${cat}`;
         const isSel = curVal === cVal;
         const catTypes = getCategoryTaskTypes(cat);
+        const isMed = (typeof isMedicalSubjectCategory === 'function') && isMedicalSubjectCategory(cat);
+        const currChapters = (isMed && typeof getSubjectCurriculum === 'function') ? (getSubjectCurriculum(cat).chapters || []) : [];
         return `
           <div style="margin-bottom:6px; border:1px solid var(--border); border-radius:11px; padding:6px; background:var(--surface);">
             <div class="tp-item-row ${isSel ? 'selected' : ''}" onclick="selectTimerPickerItem('${mode}', '${hbEsc(cVal)}', event)" style="cursor:pointer;">
               <div class="tp-item-main-click">
                 <span class="tp-radio-dot"></span>
-                <span style="font-weight:900;">${getTaskCategoryEmoji(cat)} ${hbEsc(cat)} — (التصنيف عام)</span>
+                <span style="font-weight:900;">${getTaskCategoryEmoji(cat)} ${hbEsc(cat)} ${isMed ? '(🩺 مادة طبية)' : '— (تصنيف عام)'}</span>
               </div>
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; padding-right:18px;">
@@ -13791,6 +13808,22 @@
                 return `<button type="button" class="cat-quick-chip ${ctSel ? 'active' : ''}" style="font-size:0.72rem; padding:3px 9px;" onclick="selectTimerPickerItem('${mode}', '${hbEsc(ctVal)}', event)">${tp.emoji || '📖'} ${hbEsc(tp.name)}</button>`;
               }).join('')}
             </div>
+            ${currChapters.length > 0 ? `
+              <div style="margin-top:6px; padding-top:6px; padding-right:18px; border-top:1px dashed var(--border);">
+                <div class="hint" style="font-size:0.7rem; font-weight:800; margin-bottom:4px;">🏷️ وسم سريع حسب الشابتر والمسار (لتغذية وسيط الشابتر بدقة):</div>
+                ${currChapters.map(ch => `
+                  <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:4px;">
+                    <span style="font-size:0.72rem; font-weight:900; color:var(--text); min-width:85px;">📑 ${hbEsc(ch.name)}:</span>
+                    ${catTypes.map(tp => {
+                      const cctVal = `cat_ch_type:${cat}::${ch.id}::${tp.id}`;
+                      const cctSel = curVal === cctVal;
+                      const shortLbl = tp.id === 'lesson' ? 'Lesson' : (tp.id === 'qbank' ? 'QBank' : (tp.id === 'osce_exam' ? 'OSCE-Exam' : (tp.id === 'osce_history' ? 'OSCE-History' : tp.name)));
+                      return `<button type="button" class="cat-quick-chip ${cctSel ? 'active' : ''}" style="font-size:0.68rem; padding:2px 7px;" onclick="selectTimerPickerItem('${mode}', '${hbEsc(cctVal)}', event)">${tp.emoji || '📖'} ${hbEsc(shortLbl)}</button>`;
+                    }).join('')}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
           </div>
         `;
       }).join('');
@@ -14035,7 +14068,7 @@
     // ---------- بدء/إيقاف/إنهاء ----------
     function startSandSession() {
       if (state.sandSession) return;
-      let kind = null, taskId = null, stepId = null, stepDepth = null, quotaId = null, taskTypeId = null, title = 'جلسة مباشرة (بدون مهمة)', category = 'جلسة حرة';
+      let kind = null, taskId = null, stepId = null, stepDepth = null, quotaId = null, taskTypeId = null, chapterId = null, title = 'جلسة مباشرة (بدون مهمة)', category = 'جلسة حرة';
       if (_sandMode === 'task') {
         const v = (sbId('sandTaskSelect') || {}).value || '';
         if (!v) return showAppToast('اختر تصنيفاً أو مهمة أو خطوة من القائمة، أو اضغط «بدء مباشر بدون تحديد مهمة».');
@@ -14043,6 +14076,15 @@
         if (k === 'cat') {
           const catName = id.trim() || 'عام';
           kind = 'category'; taskId = 'cat:' + catName; taskTypeId = getDefaultTaskTypeIdForCategory(catName); stepId = null; title = `${getTaskCategoryEmoji(catName)} ${catName} (تصنيف كامل)`; category = catName;
+        } else if (k === 'cat_ch_type') {
+          const parts = id.split('::');
+          const catName = (parts[0] || 'عام').trim();
+          const chId = (parts[1] || '').trim() || null;
+          const tpId = (parts[2] || '').trim() || getDefaultTaskTypeIdForCategory(catName);
+          const tpObj = getTaskTypeObj(catName, tpId);
+          const chObj = (typeof getCurriculumChapterById === 'function') ? getCurriculumChapterById(catName, chId) : null;
+          kind = 'category'; taskId = 'cat_ch_type:' + catName + '::' + (chId || '') + '::' + tpObj.id; taskTypeId = tpObj.id; chapterId = chId; stepId = null;
+          title = `${tpObj.emoji || '📖'} ${catName}${chObj ? ' • ' + chObj.name : ''} — ${tpObj.name}`; category = catName;
         } else if (k === 'cat_type') {
           const sep = id.lastIndexOf(':');
           const catName = (sep >= 0 ? id.slice(0, sep) : id).trim() || 'عام';
@@ -14052,7 +14094,7 @@
         } else if (k === 'task') {
           const t = (state.studyTasks || []).find(x => x.id === id);
           if (!t) return showAppToast('تعذّر العثور على هذه المهمة.');
-          kind = 'task'; taskId = t.id; taskTypeId = t.taskTypeId || getDefaultTaskTypeIdForCategory(t.category || 'عام'); stepId = null; title = t.title; category = t.category || 'عام';
+          kind = 'task'; taskId = t.id; taskTypeId = t.taskTypeId || getDefaultTaskTypeIdForCategory(t.category || 'عام'); chapterId = t.chapterId || null; stepId = null; title = t.title; category = t.category || 'عام';
         } else if (k === 'step') {
           const sepIdx = id.indexOf(':');
           const tId = sepIdx >= 0 ? id.slice(0, sepIdx) : id;
@@ -14077,7 +14119,7 @@
       sandAudio(); // فتح سياق الصوت بإيماءة المستخدم
       const now = Date.now();
       state.sandSession = {
-        id: 'ss' + now, kind, taskId, stepId, stepDepth, quotaId, taskTypeId, taskTitle: title, category,
+        id: 'ss' + now, kind, taskId, stepId, stepDepth, quotaId, taskTypeId, chapterId, taskTitle: title, category,
         stage: 1, cycle: 0, phase: 'work', phaseDurSec: SAND_STAGE_MIN[1] * 60,
         phaseStartTs: now, paused: false, pausedAt: null, awaiting: false,
         workAccumMs: 0, startedAt: now
@@ -14153,15 +14195,20 @@
         registerSavedTaskCategory(s.category);
       }
       let resolvedTaskTypeId = s.taskTypeId || null;
-      if (!resolvedTaskTypeId && s.taskId && !String(s.taskId).startsWith('cat') && !String(s.taskId).startsWith('quota:')) {
+      let resolvedChapterId = s.chapterId || null;
+      if ((!resolvedTaskTypeId || !resolvedChapterId) && s.taskId && !String(s.taskId).startsWith('cat') && !String(s.taskId).startsWith('quota:')) {
         const matchedTask = (state.studyTasks || []).find(x => x && x.id === s.taskId);
-        if (matchedTask && matchedTask.taskTypeId) resolvedTaskTypeId = matchedTask.taskTypeId;
+        if (matchedTask) {
+          if (!resolvedTaskTypeId && matchedTask.taskTypeId) resolvedTaskTypeId = matchedTask.taskTypeId;
+          if (!resolvedChapterId && matchedTask.chapterId) resolvedChapterId = matchedTask.chapterId;
+        }
       }
       state.studyTimeLogs.push({
         id: 'stl_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
         kind: s.kind || null,
         taskId: s.taskId || null,
         taskTypeId: resolvedTaskTypeId,
+        chapterId: resolvedChapterId,
         stepId: s.stepId || null,
         stepDepth: typeof s.stepDepth === 'number' ? s.stepDepth : null,
         quotaId: s.quotaId || null,
@@ -14987,7 +15034,7 @@
 
     function startGoldSession() {
       if (state.goldSession) return;
-      let kind = null, taskId = null, stepId = null, stepDepth = null, quotaId = null, taskTypeId = null, title = 'جلسة مباشرة (بدون مهمة)', category = 'جلسة حرة';
+      let kind = null, taskId = null, stepId = null, stepDepth = null, quotaId = null, taskTypeId = null, chapterId = null, title = 'جلسة مباشرة (بدون مهمة)', category = 'جلسة حرة';
       if (_goldMode === 'task') {
         const v = (sbId('goldTaskSelect') || {}).value || '';
         if (!v) return showAppToast('اختر تصنيفاً أو مهمة أو خطوة من القائمة، أو اضغط «بدء مباشر بدون تحديد مهمة».');
@@ -14995,6 +15042,15 @@
         if (k === 'cat') {
           const catName = id.trim() || 'عام';
           kind = 'category'; taskId = 'cat:' + catName; taskTypeId = getDefaultTaskTypeIdForCategory(catName); stepId = null; title = `${getTaskCategoryEmoji(catName)} ${catName} (تصنيف كامل)`; category = catName;
+        } else if (k === 'cat_ch_type') {
+          const parts = id.split('::');
+          const catName = (parts[0] || 'عام').trim();
+          const chId = (parts[1] || '').trim() || null;
+          const tpId = (parts[2] || '').trim() || getDefaultTaskTypeIdForCategory(catName);
+          const tpObj = getTaskTypeObj(catName, tpId);
+          const chObj = (typeof getCurriculumChapterById === 'function') ? getCurriculumChapterById(catName, chId) : null;
+          kind = 'category'; taskId = 'cat_ch_type:' + catName + '::' + (chId || '') + '::' + tpObj.id; taskTypeId = tpObj.id; chapterId = chId; stepId = null;
+          title = `${tpObj.emoji || '📖'} ${catName}${chObj ? ' • ' + chObj.name : ''} — ${tpObj.name}`; category = catName;
         } else if (k === 'cat_type') {
           const sep = id.lastIndexOf(':');
           const catName = (sep >= 0 ? id.slice(0, sep) : id).trim() || 'عام';
@@ -15004,7 +15060,7 @@
         } else if (k === 'task') {
           const t = (state.studyTasks || []).find(x => x.id === id);
           if (!t) return showAppToast('تعذّر العثور على هذه المهمة.');
-          kind = 'task'; taskId = t.id; taskTypeId = t.taskTypeId || getDefaultTaskTypeIdForCategory(t.category || 'عام'); stepId = null; title = t.title; category = t.category || 'عام';
+          kind = 'task'; taskId = t.id; taskTypeId = t.taskTypeId || getDefaultTaskTypeIdForCategory(t.category || 'عام'); chapterId = t.chapterId || null; stepId = null; title = t.title; category = t.category || 'عام';
         } else if (k === 'step') {
           const sepIdx = id.indexOf(':');
           const tId = sepIdx >= 0 ? id.slice(0, sepIdx) : id;
@@ -15036,6 +15092,7 @@
         stepDepth,
         quotaId,
         taskTypeId,
+        chapterId,
         taskTitle: title,
         category,
         startTs: now,
@@ -18118,8 +18175,24 @@
       });
     }
 
-    function getDefaultTaskTypesListForCategory(catName) {
+    function isLikelyGeneralCategoryName(catName) {
       const c = String(catName || '').trim();
+      return c === 'عام' || c === 'دين' || c === 'إنجليزي' || c === 'شخصي' || c === 'تطوير ذات' || c === 'قراءة حرة';
+    }
+
+    function getMedicalDefaultTaskTypesList() {
+      return [
+        { id: 'lesson', name: 'دروس المنهج (Lesson)', emoji: '📖', unitLabel: 'درس', stepLabel: '', defaultEstMinutes: 60 },
+        { id: 'qbank', name: 'بنوك الأسئلة (QBank)', emoji: '📝', unitLabel: 'جلسة', stepLabel: '', defaultEstMinutes: 60 },
+        { id: 'osce_exam', name: 'OSCE — الفحص السريري', emoji: '🩺', unitLabel: 'محطة', stepLabel: '', defaultEstMinutes: 40 },
+        { id: 'osce_history', name: 'OSCE — التاريخ المرضي', emoji: '🗣️', unitLabel: 'حالة', stepLabel: '', defaultEstMinutes: 30 }
+      ];
+    }
+
+    function getDefaultTaskTypesListForCategory(catName, forceIsMedical = null) {
+      const c = String(catName || '').trim();
+      const isMed = (typeof forceIsMedical === 'boolean') ? forceIsMedical : !isLikelyGeneralCategoryName(c);
+      if (isMed) return getMedicalDefaultTaskTypesList();
       if (c === 'دين') {
         return [
           { id: 'modules', name: 'درس / ورد علمي', emoji: '📖', unitLabel: '', stepLabel: '', defaultEstMinutes: 45 },
@@ -18127,10 +18200,46 @@
         ];
       }
       return [
-        { id: 'modules', name: 'موديولز / شيتات', emoji: '📖', unitLabel: '', stepLabel: '', defaultEstMinutes: 120 },
-        { id: 'qbank', name: 'حل امتحانات / QBank', emoji: '📝', unitLabel: '', stepLabel: '', defaultEstMinutes: 60 },
-        { id: 'osce', name: 'عملي / OSCE', emoji: '🩺', unitLabel: '', stepLabel: '', defaultEstMinutes: 45 }
+        { id: 'general_task', name: 'مهمة عامة', emoji: '📌', unitLabel: '', stepLabel: '', defaultEstMinutes: 60 }
       ];
+    }
+
+    function isMedicalSubjectCategory(catName) {
+      const c = String(catName || 'عام').trim() || 'عام';
+      const cfg = ensureCategoryTaskTypesConfig();
+      if (cfg[c] && typeof cfg[c].isMedical === 'boolean') return cfg[c].isMedical;
+      return !isLikelyGeneralCategoryName(c);
+    }
+
+    function setCategoryMedicalMode(catName, isMed) {
+      const c = String(catName || '').trim();
+      if (!c) return;
+      const cfg = ensureCategoryTaskTypesConfig();
+      if (!cfg[c]) cfg[c] = { stepLabel: '', isMedical: !!isMed, types: getDefaultTaskTypesListForCategory(c, !!isMed), _migratedMed4TracksV3: true };
+      cfg[c].isMedical = !!isMed;
+      if (cfg[c].isMedical) {
+        const existingById = {};
+        (cfg[c].types || []).forEach(tp => { if (tp && tp.id) existingById[tp.id] = tp; });
+        const medDefaults = getMedicalDefaultTaskTypesList();
+        medDefaults.forEach(def => {
+          if (!existingById[def.id]) {
+            if (def.id === 'lesson' && existingById['modules']) {
+              existingById['lesson'] = Object.assign({}, def, { defaultEstMinutes: existingById['modules'].defaultEstMinutes || def.defaultEstMinutes, manualOverrideAt: existingById['modules'].manualOverrideAt });
+            } else if (def.id === 'osce_exam' && existingById['osce']) {
+              existingById['osce_exam'] = Object.assign({}, def, { defaultEstMinutes: existingById['osce'].defaultEstMinutes || def.defaultEstMinutes, manualOverrideAt: existingById['osce'].manualOverrideAt });
+            } else {
+              existingById[def.id] = Object.assign({}, def);
+            }
+          }
+        });
+        const customExtras = (cfg[c].types || []).filter(tp => tp && !['modules', 'osce', 'lesson', 'qbank', 'osce_exam', 'osce_history'].includes(tp.id));
+        cfg[c].types = [existingById['lesson'], existingById['qbank'], existingById['osce_exam'], existingById['osce_history'], ...customExtras];
+        ensureMedicalCurriculum();
+        if (!state.medicalCurriculum[c]) state.medicalCurriculum[c] = { chapters: [] };
+      }
+      saveState();
+      renderAll();
+      showAppToast(isMed ? `🩺 تم تحويل «${c}» إلى مادة طبية (بشجرة منهج والمسارات الـ 4).` : `📁 تم تحويل «${c}» إلى تصنيف عام.`);
     }
 
     function ensureCategoryTaskTypesConfig() {
@@ -18138,34 +18247,545 @@
       if (!state.categoryTaskTypesConfig || typeof state.categoryTaskTypesConfig !== 'object') {
         state.categoryTaskTypesConfig = {};
       }
-      const autoUnitDefaults = new Set(['موديول', 'بلوك أسئلة', 'محطة OSCE', 'مهمة', 'درس', 'وجه / نصاب']);
-      const autoStepDefaults = new Set(['Chunk', 'مجموعة', 'حالة', 'محور', 'مقطع', 'خطوة']);
-
       cats.forEach(c => {
         if (!state.categoryTaskTypesConfig[c] || typeof state.categoryTaskTypesConfig[c] !== 'object') {
+          const isMed = !isLikelyGeneralCategoryName(c);
           state.categoryTaskTypesConfig[c] = {
             stepLabel: '',
-            types: getDefaultTaskTypesListForCategory(c),
-            _migratedCleanDefaultsV2: true
+            isMedical: isMed,
+            types: getDefaultTaskTypesListForCategory(c, isMed),
+            _migratedCleanDefaultsV2: true,
+            _migratedMed4TracksV3: true
           };
         } else {
           const entry = state.categoryTaskTypesConfig[c];
           if (typeof entry.stepLabel !== 'string') entry.stepLabel = '';
+          if (typeof entry.isMedical !== 'boolean') entry.isMedical = !isLikelyGeneralCategoryName(c);
           if (!Array.isArray(entry.types) || entry.types.length === 0) {
-            entry.types = getDefaultTaskTypesListForCategory(c);
+            entry.types = getDefaultTaskTypesListForCategory(c, entry.isMedical);
           }
-          // تنظيف القيم التلقائية القديمة مرة واحدة حتى تكون الوحدة مخفية إذا لم يكتبها المستخدم ويكون الـ Step هو 'Step' افتراضياً
-          if (!entry._migratedCleanDefaultsV2) {
-            if (autoStepDefaults.has(entry.stepLabel)) entry.stepLabel = '';
-            entry.types.forEach(tp => {
-              if (tp && autoUnitDefaults.has(tp.unitLabel)) tp.unitLabel = '';
-              if (tp && autoStepDefaults.has(tp.stepLabel)) tp.stepLabel = '';
-            });
-            entry._migratedCleanDefaultsV2 = true;
+          if (!entry._migratedMed4TracksV3) {
+            if (entry.isMedical) {
+              const byId = {};
+              entry.types.forEach(tp => { if (tp && tp.id) byId[tp.id] = tp; });
+              const medDefs = getMedicalDefaultTaskTypesList();
+              const nextTypes = medDefs.map(def => {
+                if (byId[def.id]) return byId[def.id];
+                if (def.id === 'lesson' && byId['modules']) {
+                  return Object.assign({}, def, { defaultEstMinutes: byId['modules'].defaultEstMinutes || def.defaultEstMinutes, manualOverrideAt: byId['modules'].manualOverrideAt });
+                }
+                if (def.id === 'osce_exam' && byId['osce']) {
+                  return Object.assign({}, def, { defaultEstMinutes: byId['osce'].defaultEstMinutes || def.defaultEstMinutes, manualOverrideAt: byId['osce'].manualOverrideAt });
+                }
+                return Object.assign({}, def);
+              });
+              const extras = entry.types.filter(tp => tp && !['modules', 'osce', 'lesson', 'qbank', 'osce_exam', 'osce_history'].includes(tp.id));
+              entry.types = [...nextTypes, ...extras];
+            }
+            entry._migratedMed4TracksV3 = true;
           }
         }
       });
       return state.categoryTaskTypesConfig;
+    }
+
+    // ==================== شجرة المنهج الطبي (Curriculum Tree: Subject -> Chapters -> Modules -> Lessons) ====================
+    window._currExpanded = window._currExpanded || {};
+
+    function ensureMedicalCurriculum() {
+      if (!state.medicalCurriculum || typeof state.medicalCurriculum !== 'object') {
+        state.medicalCurriculum = {};
+      }
+      return state.medicalCurriculum;
+    }
+
+    function getSubjectCurriculum(catName) {
+      const c = String(catName || '').trim();
+      const mc = ensureMedicalCurriculum();
+      if (!mc[c] || typeof mc[c] !== 'object') mc[c] = { chapters: [] };
+      if (!Array.isArray(mc[c].chapters)) mc[c].chapters = [];
+      return mc[c];
+    }
+
+    function getCurriculumChapterById(catName, chapterId) {
+      if (!catName || !chapterId) return null;
+      const sc = getSubjectCurriculum(catName);
+      return (sc.chapters || []).find(ch => ch && ch.id === chapterId) || null;
+    }
+
+    function getChapterCurriculumStats(ch) {
+      if (!ch) return { totalModules: 0, doneModules: 0, remModules: 0, totalLessons: 0, doneLessons: 0, remLessons: 0, pct: 0 };
+      const mods = Array.isArray(ch.modules) ? ch.modules : [];
+      let totalLessons = 0, doneLessons = 0, doneModules = 0;
+      mods.forEach(m => {
+        const les = Array.isArray(m.lessons) ? m.lessons : [];
+        const mDone = les.filter(l => l && l.done).length;
+        totalLessons += les.length;
+        doneLessons += mDone;
+        if (les.length > 0 && mDone === les.length) doneModules++;
+      });
+      const pct = totalLessons > 0 ? Math.round((doneLessons / totalLessons) * 100) : 0;
+      return {
+        totalModules: mods.length,
+        doneModules,
+        remModules: Math.max(0, mods.length - doneModules),
+        totalLessons,
+        doneLessons,
+        remLessons: Math.max(0, totalLessons - doneLessons),
+        pct
+      };
+    }
+
+    function getSubjectCurriculumStats(catName) {
+      const sc = getSubjectCurriculum(catName);
+      const chs = sc.chapters || [];
+      let totalChapters = chs.length, doneChapters = 0;
+      let totalModules = 0, doneModules = 0;
+      let totalLessons = 0, doneLessons = 0;
+      chs.forEach(ch => {
+        const st = getChapterCurriculumStats(ch);
+        totalModules += st.totalModules;
+        doneModules += st.doneModules;
+        totalLessons += st.totalLessons;
+        doneLessons += st.doneLessons;
+        if (st.totalLessons > 0 && st.doneLessons === st.totalLessons) doneChapters++;
+      });
+      const pct = totalLessons > 0 ? Math.round((doneLessons / totalLessons) * 100) : 0;
+      return {
+        totalChapters,
+        doneChapters,
+        remChapters: Math.max(0, totalChapters - doneChapters),
+        totalModules,
+        doneModules,
+        remModules: Math.max(0, totalModules - doneModules),
+        totalLessons,
+        doneLessons,
+        remLessons: Math.max(0, totalLessons - doneLessons),
+        pct
+      };
+    }
+
+    function toggleCurriculumTreeExpand(key) {
+      window._currExpanded = window._currExpanded || {};
+      window._currExpanded[key] = !window._currExpanded[key];
+      renderCategoriesStudioPage();
+    }
+
+    function addCurriculumChapterBulk(catName) {
+      const safeId = catName.replace(/[^a-zA-Z0-9؀-ۿ]/g, '_');
+      const nameInp = document.getElementById('bulkChName_' + safeId);
+      const modInp = document.getElementById('bulkChMods_' + safeId);
+      const lesInp = document.getElementById('bulkChLes_' + safeId);
+      const chName = (nameInp ? nameInp.value : '').trim();
+      const modCount = Math.max(1, Math.min(40, parseInt(modInp ? modInp.value : '4', 10) || 4));
+      const lesPerMod = Math.max(1, Math.min(30, parseInt(lesInp ? lesInp.value : '3', 10) || 3));
+      if (!chName) return showAppToast('الرجاء كتابة اسم الشابتر أولاً (مثال: Cardiology).');
+
+      const sc = getSubjectCurriculum(catName);
+      const ts = Date.now();
+      const chId = 'ch_' + ts + '_' + Math.floor(Math.random() * 1000);
+      const modules = [];
+      for (let m = 1; m <= modCount; m++) {
+        const modId = 'mod_' + ts + '_' + m + '_' + Math.floor(Math.random() * 1000);
+        const lessons = [];
+        for (let l = 1; l <= lesPerMod; l++) {
+          lessons.push({
+            id: 'les_' + ts + '_' + m + '_' + l + '_' + Math.floor(Math.random() * 1000),
+            title: `Module ${m} — Lesson ${l}`,
+            done: false,
+            preCompleted: false,
+            completedAt: null
+          });
+        }
+        modules.push({ id: modId, name: `Module ${m}`, lessons });
+      }
+      sc.chapters.push({ id: chId, name: chName, modules });
+      window._currExpanded['subj_' + catName] = true;
+      window._currExpanded['ch_' + chId] = true;
+      if (nameInp) nameInp.value = '';
+      saveState();
+      renderAll();
+      showAppToast(`🌳 تمت إضافة شابتر «${chName}» (${modCount} موديول × ${lesPerMod} دروس = ${modCount * lesPerMod} درس) بنجاح!`);
+    }
+
+    function deleteCurriculumChapter(catName, chId) {
+      const sc = getSubjectCurriculum(catName);
+      const ch = sc.chapters.find(x => x.id === chId);
+      if (!ch) return;
+      openAppConfirmDialog('🗑️ حذف الشابتر', `هل تريد حذف شابتر «${ch.name}» بجميع موديولاته ودروسه من شجرة «${catName}»؟`, function() {
+        sc.chapters = sc.chapters.filter(x => x.id !== chId);
+        saveState();
+        renderAll();
+        showAppToast(`🗑️ تم حذف شابتر «${ch.name}».`);
+      }, true);
+    }
+
+    function addCurriculumModule(catName, chId) {
+      const ch = getCurriculumChapterById(catName, chId);
+      if (!ch) return;
+      const nextNum = (ch.modules || []).length + 1;
+      const ts = Date.now();
+      const modId = 'mod_' + ts + '_' + Math.floor(Math.random() * 1000);
+      ch.modules.push({
+        id: modId,
+        name: `Module ${nextNum}`,
+        lessons: [
+          { id: 'les_' + ts + '_1', title: `Module ${nextNum} — Lesson 1`, done: false, preCompleted: false, completedAt: null }
+        ]
+      });
+      window._currExpanded['ch_' + chId] = true;
+      saveState();
+      renderAll();
+    }
+
+    function renameCurriculumModule(catName, chId, modId) {
+      const ch = getCurriculumChapterById(catName, chId);
+      const mod = ch && (ch.modules || []).find(m => m.id === modId);
+      if (!mod) return;
+      openAppPromptDialog('✎ تعديل اسم الموديول', 'اكتب الاسم الجديد للموديول:', mod.name, function(val) {
+        const clean = (val || '').trim();
+        if (!clean) return;
+        mod.name = clean;
+        saveState();
+        renderAll();
+      });
+    }
+
+    function deleteCurriculumModule(catName, chId, modId) {
+      const ch = getCurriculumChapterById(catName, chId);
+      if (!ch) return;
+      ch.modules = (ch.modules || []).filter(m => m.id !== modId);
+      saveState();
+      renderAll();
+    }
+
+    function addCurriculumLesson(catName, chId, modId) {
+      const ch = getCurriculumChapterById(catName, chId);
+      const mod = ch && (ch.modules || []).find(m => m.id === modId);
+      if (!mod) return;
+      const nextNum = (mod.lessons || []).length + 1;
+      mod.lessons.push({
+        id: 'les_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        title: `${mod.name} — Lesson ${nextNum}`,
+        done: false,
+        preCompleted: false,
+        completedAt: null
+      });
+      saveState();
+      renderAll();
+    }
+
+    function renameCurriculumLesson(catName, chId, modId, lesId) {
+      const ch = getCurriculumChapterById(catName, chId);
+      const mod = ch && (ch.modules || []).find(m => m.id === modId);
+      const les = mod && (mod.lessons || []).find(l => l.id === lesId);
+      if (!les) return;
+      openAppPromptDialog('✎ تعديل اسم الدرس', 'اكتب الاسم الجديد للدرس:', les.title, function(val) {
+        const clean = (val || '').trim();
+        if (!clean) return;
+        les.title = clean;
+        saveState();
+        renderAll();
+      });
+    }
+
+    function deleteCurriculumLesson(catName, chId, modId, lesId) {
+      const ch = getCurriculumChapterById(catName, chId);
+      const mod = ch && (ch.modules || []).find(m => m.id === modId);
+      if (!mod) return;
+      mod.lessons = (mod.lessons || []).filter(l => l.id !== lesId);
+      saveState();
+      renderAll();
+    }
+
+    function toggleCurriculumLessonDone(catName, chId, modId, lesId, asPreCompleted = true) {
+      const ch = getCurriculumChapterById(catName, chId);
+      const mod = ch && (ch.modules || []).find(m => m.id === modId);
+      const les = mod && (mod.lessons || []).find(l => l.id === lesId);
+      if (!les) return;
+      les.done = !les.done;
+      les.preCompleted = les.done ? !!asPreCompleted : false;
+      les.completedAt = les.done ? getSystemTodayYMD() : null;
+      saveState();
+      renderAll();
+    }
+
+    function markCurriculumModulePreCompleted(catName, chId, modId, markDone) {
+      const ch = getCurriculumChapterById(catName, chId);
+      const mod = ch && (ch.modules || []).find(m => m.id === modId);
+      if (!mod) return;
+      const today = getSystemTodayYMD();
+      (mod.lessons || []).forEach(l => {
+        l.done = !!markDone;
+        l.preCompleted = !!markDone;
+        l.completedAt = markDone ? today : null;
+      });
+      saveState();
+      renderAll();
+      showAppToast(markDone ? `✓ تم تعليم موديول «${mod.name}» كمنجز مسبقاً (Starting Offset).` : `↺ تم إعادة فتح موديول «${mod.name}».`);
+    }
+
+    function markCurriculumChapterPreCompleted(catName, chId, markDone) {
+      const ch = getCurriculumChapterById(catName, chId);
+      if (!ch) return;
+      const today = getSystemTodayYMD();
+      (ch.modules || []).forEach(m => {
+        (m.lessons || []).forEach(l => {
+          l.done = !!markDone;
+          l.preCompleted = !!markDone;
+          l.completedAt = markDone ? today : null;
+        });
+      });
+      saveState();
+      renderAll();
+      showAppToast(markDone ? `✓ تم تعليم شابتر «${ch.name}» كمنجز مسبقاً.` : `↺ تم إعادة فتح شابتر «${ch.name}».`);
+    }
+
+    function syncCurriculumLessonFromTask(taskObj, isDone) {
+      if (!taskObj || !taskObj.chapterId || !taskObj.lessonId) return;
+      const ch = getCurriculumChapterById(taskObj.category || 'عام', taskObj.chapterId);
+      if (!ch) return;
+      for (const mod of (ch.modules || [])) {
+        if (taskObj.moduleId && mod.id !== taskObj.moduleId) continue;
+        const les = (mod.lessons || []).find(l => l.id === taskObj.lessonId);
+        if (les) {
+          les.done = !!isDone;
+          les.preCompleted = false;
+          les.completedAt = isDone ? (taskObj.completedAt || getSystemTodayYMD()) : null;
+          return;
+        }
+      }
+    }
+
+    // ==================== الوسيط الهرمي (Hierarchical Median: Chapter -> Subject Fallback -> Default) ====================
+    function computeHierarchicalTrackMedian(catName, trackId, chapterId = null) {
+      const cfg = ensurePlanningAnalyticsConfig();
+      const win = getPlanningAnalyticsDateWindow();
+      const allLogs = Array.isArray(state.studyTimeLogs) ? state.studyTimeLogs : [];
+      const allTasks = Array.isArray(state.studyTasks) ? state.studyTasks : [];
+      const tpObj = getTaskTypeObj(catName, trackId);
+      const overrideTs = Number(tpObj && tpObj.manualOverrideAt) || 0;
+      const matchesTrack = (tId) => {
+        if (tId === trackId) return true;
+        if (trackId === 'lesson' && tId === 'modules') return true;
+        if (trackId === 'osce_exam' && tId === 'osce') return true;
+        return false;
+      };
+
+      const taskMap = {};
+      allTasks.forEach(t => { if (t && t.id) taskMap[t.id] = t; });
+
+      // جمع أزمنة المهام المكتملة داخل النافذة لهذا المسار + الجلسات الحرة الموسومة (cat_ch_type / cat_type)
+      const chDurations = [];
+      const subjDurations = [];
+
+      const compTasks = allTasks.filter(t => t && (t.category || 'عام') === catName && t.done &&
+        matchesTrack(t.taskTypeId || getDefaultTaskTypeIdForCategory(catName)) &&
+        (!t.completedAt || (t.completedAt >= win.from && t.completedAt <= win.to)));
+
+      compTasks.forEach(t => {
+        const logs = allLogs.filter(l => l && l.taskId === t.id && (!overrideTs || l.timestamp >= overrideTs));
+        const m = logs.reduce((a, x) => a + (Number(x.durationMinutes) || 0), 0);
+        if (m >= 5) {
+          subjDurations.push(m);
+          if (chapterId && t.chapterId === chapterId) chDurations.push(m);
+        }
+      });
+
+      // الجلسات الحرة الموسومة مباشرة من المؤقت (cat_ch_type / cat_type)
+      allLogs.forEach(l => {
+        if (!l || l.kind !== 'category' || (l.category || 'عام') !== catName) return;
+        const ymd = formatDateYMD(new Date(l.timestamp));
+        if (ymd < win.from || ymd > win.to) return;
+        if (overrideTs && l.timestamp < overrideTs) return;
+        if (!matchesTrack(l.taskTypeId || '')) return;
+        const m = Number(l.durationMinutes) || 0;
+        if (m >= 5) {
+          subjDurations.push(m);
+          if (chapterId && l.chapterId === chapterId) chDurations.push(m);
+        }
+      });
+
+      const agg = (arr) => (cfg.advisorUseMedian !== false)
+        ? Math.round(advMedian(arr))
+        : Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
+
+      // المستوى 1: وسيط الشابتر نفسه
+      if (chapterId && chDurations.length >= 2) {
+        return {
+          minutes: agg(chDurations),
+          p80: Math.round(advPercentile(chDurations, 0.80)),
+          level: 'chapter',
+          sampleCount: chDurations.length,
+          isMeasured: true
+        };
+      }
+      // المستوى 2: Fallback إلى الوسيط العام للمادة عبر كل شابتراتها
+      if (subjDurations.length >= 2 || (subjDurations.length === 1 && !overrideTs)) {
+        return {
+          minutes: agg(subjDurations),
+          p80: subjDurations.length >= 3 ? Math.round(advPercentile(subjDurations, 0.80)) : agg(subjDurations),
+          level: chapterId ? 'subject_fallback' : 'subject',
+          sampleCount: subjDurations.length,
+          isMeasured: true
+        };
+      }
+      // المستوى 3: التقدير المبدئي للمسار
+      const defMin = Number(tpObj && tpObj.defaultEstMinutes) || 60;
+      return {
+        minutes: defMin,
+        p80: defMin,
+        level: 'default',
+        sampleCount: 0,
+        isMeasured: false
+      };
+    }
+
+    // ==================== التخطيط التسلسلي الذكي (Auto-Sequencing + Multi-Chapter Ratio + Chapter Overflow) ====================
+    function ensureCategoryAdvisorChaptersConfig(catName) {
+      const cfg = ensurePlanningAnalyticsConfig();
+      if (!cfg.advisorChapterAllocations || typeof cfg.advisorChapterAllocations !== 'object') {
+        cfg.advisorChapterAllocations = {};
+      }
+      const sc = getSubjectCurriculum(catName);
+      const chs = sc.chapters || [];
+      if (!cfg.advisorChapterAllocations[catName]) {
+        cfg.advisorChapterAllocations[catName] = { selected: {}, ratios: {} };
+        if (chs[0]) cfg.advisorChapterAllocations[catName].selected[chs[0].id] = true;
+      }
+      const entry = cfg.advisorChapterAllocations[catName];
+      if (!entry.selected) entry.selected = {};
+      if (!entry.ratios) entry.ratios = {};
+      const validIds = new Set(chs.map(c => c.id));
+      Object.keys(entry.selected).forEach(k => { if (!validIds.has(k)) delete entry.selected[k]; });
+      chs.forEach(c => {
+        if (!Number.isFinite(Number(entry.ratios[c.id])) || Number(entry.ratios[c.id]) <= 0) entry.ratios[c.id] = 1;
+      });
+      if (chs.length > 0 && !chs.some(c => entry.selected[c.id])) {
+        const firstIncomplete = chs.find(c => getChapterCurriculumStats(c).remLessons > 0) || chs[0];
+        entry.selected[firstIncomplete.id] = true;
+      }
+      return entry;
+    }
+
+    function toggleAdvisorChapterSelection(catName, chId) {
+      const entry = ensureCategoryAdvisorChaptersConfig(catName);
+      const activeIds = Object.keys(entry.selected).filter(k => entry.selected[k]);
+      if (entry.selected[chId]) {
+        if (activeIds.length <= 1) return showAppToast('يجب اختيار شابتر واحد على الأقل داخل المادة الطبية.');
+        delete entry.selected[chId];
+      } else {
+        entry.selected[chId] = true;
+      }
+      saveState();
+      renderWeeklyPlanAdvisorModalBody();
+      renderAdvisorStudioPage();
+    }
+
+    function updateAdvisorChapterRatio(catName, chId, val) {
+      const entry = ensureCategoryAdvisorChaptersConfig(catName);
+      entry.ratios[chId] = Math.max(1, Math.min(20, parseInt(val, 10) || 1));
+      saveState();
+      renderWeeklyPlanAdvisorModalBody();
+      renderAdvisorStudioPage();
+    }
+
+    function getRemainingLessonsQueueForChapter(catName, ch, targetSun, skipAlreadyPlannedInWeek = true) {
+      if (!ch) return [];
+      const alreadyPlannedLessonIds = new Set();
+      if (skipAlreadyPlannedInWeek && targetSun) {
+        (state.studyTasks || []).forEach(t => {
+          if (t && t.weekSunday === targetSun && t.lessonId && !t.done) {
+            alreadyPlannedLessonIds.add(t.lessonId);
+          }
+        });
+      }
+      const queue = [];
+      (ch.modules || []).forEach(mod => {
+        (mod.lessons || []).forEach(les => {
+          if (les && !les.done && !alreadyPlannedLessonIds.has(les.id)) {
+            queue.push({
+              chapterId: ch.id,
+              chapterName: ch.name,
+              moduleId: mod.id,
+              moduleName: mod.name,
+              lessonId: les.id,
+              lessonTitle: les.title,
+              fullTitle: `${ch.name} • ${les.title}`
+            });
+          }
+        });
+      });
+      return queue;
+    }
+
+    function buildAutoSequencedLessonPlan(catName, targetSun, lessonBudgetMin, subtractExisting) {
+      const sc = getSubjectCurriculum(catName);
+      const chs = sc.chapters || [];
+      if (chs.length === 0) return null;
+      const chCfg = ensureCategoryAdvisorChaptersConfig(catName);
+      const selectedChs = chs.filter(c => chCfg.selected[c.id]);
+      if (selectedChs.length === 0) return null;
+
+      const chStates = selectedChs.map(ch => {
+        const med = computeHierarchicalTrackMedian(catName, 'lesson', ch.id);
+        const queue = getRemainingLessonsQueueForChapter(catName, ch, targetSun, subtractExisting);
+        return {
+          ch,
+          ratio: Math.max(1, Number(chCfg.ratios[ch.id]) || 1),
+          unitMin: Math.max(5, med.minutes),
+          medianInfo: med,
+          queue,
+          assigned: [],
+          completed100: false
+        };
+      });
+
+      let remBudget = Math.max(0, Math.round(lessonBudgetMin));
+      // دورة توزيع حسب الـ Ratio بين الشابترات المختارة، مع حماية Chapter Overflow وإعادة توجيه الفائض تلقائياً للشابتر التالي
+      let progress = true;
+      let guard = 0;
+      while (progress && guard < 200) {
+        progress = false;
+        guard++;
+        for (const st of chStates) {
+          let takeThisRound = st.ratio;
+          while (takeThisRound > 0) {
+            if (st.assigned.length >= st.queue.length) {
+              if (st.queue.length > 0 || getChapterCurriculumStats(st.ch).remLessons === 0) {
+                st.completed100 = true;
+              }
+              break;
+            }
+            if (remBudget >= st.unitMin) {
+              st.assigned.push(st.queue[st.assigned.length]);
+              remBudget -= st.unitMin;
+              takeThisRound--;
+              progress = true;
+              if (st.assigned.length >= st.queue.length) {
+                st.completed100 = true;
+                break;
+              }
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      const plannedLessons = [];
+      chStates.forEach(st => {
+        st.assigned.forEach(item => plannedLessons.push(Object.assign({}, item, { unitMin: st.unitMin })));
+      });
+      const usedMin = plannedLessons.reduce((a, x) => a + x.unitMin, 0);
+      const overflowChapters = chStates.filter(st => st.completed100 && st.assigned.length > 0).map(st => st.ch.name);
+      return {
+        chStates,
+        plannedLessons,
+        usedMin,
+        surplusMin: Math.max(0, remBudget),
+        overflowChapters
+      };
     }
 
     function getCategoryTaskTypes(catName) {
@@ -18470,15 +19090,26 @@
     function addNewCategoryFromStudioPage() {
       const emInp = document.getElementById('studioNewCatEmojiInp');
       const nmInp = document.getElementById('studioNewCatNameInp');
-      const stInp = document.getElementById('studioNewCatStepLabelInp');
+      const medSel = document.getElementById('studioNewCatIsMedicalSel');
       const name = nmInp ? nmInp.value.trim() : '';
-      const emoji = (emInp && emInp.value.trim()) ? emInp.value.trim() : '🩺';
-      const stepLbl = (stInp && stInp.value.trim()) ? stInp.value.trim() : '';
+      const isMed = !medSel || medSel.value === 'medical';
+      const emoji = (emInp && emInp.value.trim()) ? emInp.value.trim() : (isMed ? '🩺' : '📂');
       if (!name) return showAppToast('الرجاء كتابة اسم التصنيف أولاً.');
-      registerSavedTaskCategory(name, emoji, stepLbl);
+      registerSavedTaskCategory(name, emoji, '');
+      const cfg = ensureCategoryTaskTypesConfig();
+      cfg[name] = {
+        stepLabel: '',
+        isMedical: isMed,
+        types: getDefaultTaskTypesListForCategory(name, isMed),
+        _migratedCleanDefaultsV2: true,
+        _migratedMed4TracksV3: true
+      };
+      if (isMed) {
+        ensureMedicalCurriculum();
+        if (!state.medicalCurriculum[name]) state.medicalCurriculum[name] = { chapters: [] };
+      }
       if (nmInp) nmInp.value = '';
       if (emInp) emInp.value = '';
-      if (stInp) stInp.value = '';
       saveState();
       renderAll();
       showAppToast(`✅ تمت إضافة التصنيف «${emoji} ${name}» مع أنواع المهام الافتراضية!`);
@@ -18674,31 +19305,39 @@
       if (!box) return;
       const cats = ensureSavedTaskCategories();
       ensureCategoryTaskTypesConfig();
+      ensureMedicalCurriculum();
       const bench = computeCategoryPlanningBenchmarks();
 
       box.innerHTML = `
         <div class="card" style="margin-bottom:14px; padding:16px 18px;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
             <div>
-              <h3 style="margin:0; font-size:1.06rem;">🗂️ إدارة التصنيفات وأنواع المهام</h3>
-              <p class="hint" style="margin:3px 0 0; font-size:0.79rem;">لكل تصنيف أنواع مهامه المستقلة ومتوسط زمنها واسم الـ Step (إذا تركت اسم الوحدة فارغاً يختفي تماماً، وإذا تركت اسم الـ Step فارغاً يظهر كـ Step).</p>
+              <h3 style="margin:0; font-size:1.06rem;">🗂️ إدارة المواد الطبية والتصنيفات وشجرة المنهج</h3>
+              <p class="hint" style="margin:3px 0 0; font-size:0.79rem;">ميّز بين <strong>المواد الطبية</strong> (شجرة Chapters ← Modules ← Lessons + المسارات الأربعة بالوسيط) و<strong>التصنيفات العامة</strong> البسيطة.</p>
             </div>
           </div>
 
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:var(--surface-2); padding:10px 12px; border-radius:14px; border:1px solid var(--border);">
-            <input type="text" id="studioNewCatEmojiInp" placeholder="🩺" style="width:58px; text-align:center; font-size:1.05rem;" />
-            <input type="text" id="studioNewCatNameInp" placeholder="اسم التصنيف الجديد (مثال: طب الطوارئ)..." style="flex:1.4; min-width:170px;" />
-            <input type="text" id="studioNewCatStepLabelInp" placeholder="اسم الـ Step (الافتراضي: Step)" style="flex:1; min-width:150px;" />
-            <button type="button" class="btn btn-success btn-sm" onclick="addNewCategoryFromStudioPage()">+ إضافة تصنيف</button>
+            <input type="text" id="studioNewCatEmojiInp" placeholder="🩺" style="width:54px; text-align:center; font-size:1.05rem;" />
+            <input type="text" id="studioNewCatNameInp" placeholder="اسم المادة أو التصنيف (مثال: Medicine)..." style="flex:1.4; min-width:170px;" />
+            <select id="studioNewCatIsMedicalSel" style="flex:1; min-width:175px; font-weight:800;">
+              <option value="medical">🩺 مادة طبية (بشجرة منهج)</option>
+              <option value="general">📁 تصنيف عام (بسيط)</option>
+            </select>
+            <button type="button" class="btn btn-success btn-sm" onclick="addNewCategoryFromStudioPage()">+ إضافة</button>
           </div>
         </div>
 
         ${cats.map(c => {
           const em = getTaskCategoryEmoji(c);
-          const catCfg = state.categoryTaskTypesConfig[c] || { stepLabel: '', types: getDefaultTaskTypesListForCategory(c) };
-          const customStepVal = catCfg.stepLabel || '';
+          const catCfg = state.categoryTaskTypesConfig[c] || { stepLabel: '', isMedical: !isLikelyGeneralCategoryName(c), types: getDefaultTaskTypesListForCategory(c) };
+          const isMed = !!catCfg.isMedical;
           const cb = (bench.categories && bench.categories[c]) ? bench.categories[c] : null;
           const safeCatJs = hbEsc(c.replace(/'/g, "\'"));
+          const safeId = c.replace(/[^a-zA-Z0-9؀-ۿ]/g, '_');
+          const subjStats = isMed ? getSubjectCurriculumStats(c) : null;
+          const sc = isMed ? getSubjectCurriculum(c) : null;
+          const isTreeOpen = !!(window._currExpanded && window._currExpanded['subj_' + c]);
 
           return `
             <div class="cat-studio-card">
@@ -18706,19 +19345,27 @@
                 <div style="display:flex; align-items:center; gap:10px;">
                   <span style="font-size:1.5rem;">${em}</span>
                   <div>
-                    <div style="font-weight:900; font-size:1.02rem; color:var(--text);">${hbEsc(c)}</div>
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      <span style="font-weight:900; font-size:1.02rem; color:var(--text);">${hbEsc(c)}</span>
+                      <span class="chip ${isMed ? 'done' : ''}" style="font-size:0.7rem; padding:1px 8px;">${isMed ? '🩺 مادة طبية' : '📁 تصنيف عام'}</span>
+                      ${isMed && subjStats && subjStats.totalLessons > 0 ? `<span class="chip" style="font-size:0.7rem; padding:1px 8px; color:var(--accent-ink); font-weight:900;">🌳 ${subjStats.pct}% (${subjStats.doneLessons}/${subjStats.totalLessons} درس)</span>` : ''}
+                    </div>
                     <div class="hint" style="font-size:0.75rem;">
                       الزمن المسجل: <strong>${fmtMinutesAr(cb ? cb.totalMinutes : 0)}</strong> • المكتمل: ${cb ? cb.completedTasksCount : 0}
                     </div>
                   </div>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <div style="display:inline-flex; align-items:center; gap:5px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:4px 8px;">
-                    <span class="hint" style="font-size:0.73rem; font-weight:800;">🌿 اسم الـ Step:</span>
-                    <input type="text" value="${hbEsc(customStepVal)}" placeholder="Step" onchange="updateCategoryCustomStepLabel('${safeCatJs}', this.value)" style="width:96px; padding:3px 6px; font-size:0.76rem; font-weight:800;" />
-                  </div>
-                  <button type="button" class="btn btn-outline btn-sm" style="padding:5px 10px; font-size:0.75rem;" onclick="openAddCategoryTaskTypeModal('${safeCatJs}')">+ إضافة نوع مهمة</button>
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  ${isMed ? `
+                    <button type="button" class="btn btn-primary btn-sm" style="padding:5px 10px; font-size:0.75rem;" onclick="toggleCurriculumTreeExpand('subj_${safeCatJs}')">
+                      🌳 شجرة المنهج (${sc.chapters.length}) ${isTreeOpen ? '▲' : '▼'}
+                    </button>
+                  ` : ''}
+                  <button type="button" class="btn btn-outline btn-sm" style="padding:5px 9px; font-size:0.73rem;" onclick="setCategoryMedicalMode('${safeCatJs}', ${!isMed})" title="تحويل نوع التصنيف">
+                    ${isMed ? '↩️ عام' : '🩺 تحويل لمادة طبية'}
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" style="padding:5px 9px; font-size:0.74rem;" onclick="openAddCategoryTaskTypeModal('${safeCatJs}')">+ مسار</button>
                   <button type="button" class="btn btn-outline btn-sm" style="padding:5px 9px; font-size:0.75rem;" onclick="editTaskCategory('${safeCatJs}')">✎</button>
                   ${c !== 'عام' ? `<button type="button" class="btn btn-outline btn-sm" style="padding:5px 9px; font-size:0.75rem; color:var(--danger); border-color:rgba(239,68,68,0.35);" onclick="deleteSavedCategoryFromModal('${safeCatJs}')">🗑️</button>` : ''}
                 </div>
@@ -18726,30 +19373,111 @@
 
               <div>
                 ${(catCfg.types || []).map(tp => {
-                  const tb = (cb && cb.byType && cb.byType[tp.id]) ? cb.byType[tp.id] : { avgTaskMinutes: tp.defaultEstMinutes || 90, avgPrimaryStepMinutes: 25, completedTasksCount: 0, totalMinutes: 0, isMeasuredFromLogs: false };
+                  const hMed = computeHierarchicalTrackMedian(c, tp.id, null);
                   const uLbl = getEffectiveUnitLabel(tp);
-                  const effStepLbl = (tp.stepLabel && tp.stepLabel.trim()) ? tp.stepLabel.trim() : (customStepVal || 'Step');
                   return `
                     <div class="cat-type-row">
                       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                         <span style="font-weight:900; font-size:0.9rem; color:var(--text);">${tp.emoji || '📖'} ${hbEsc(tp.name)}</span>
-                        ${uLbl ? `<span class="chip" style="font-size:0.71rem;">📏 الوحدة: ${hbEsc(uLbl)}</span>` : ''}
-                        <span class="chip" style="font-size:0.71rem;">🌿 ${hbEsc(effStepLbl)}</span>
+                        ${uLbl ? `<span class="chip" style="font-size:0.71rem;">📏 ${hbEsc(uLbl)}</span>` : ''}
                       </div>
                       <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                         <div style="display:inline-flex; align-items:center; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:3px 8px;">
-                          <span class="hint" style="font-size:0.72rem; font-weight:800;">⏱️ الزمن (د):</span>
-                          <input type="number" min="5" max="600" value="${tb.avgTaskMinutes}" onchange="quickUpdateCategoryTaskTypeMinutes('${safeCatJs}', '${hbEsc(tp.id)}', this.value)" style="width:62px; padding:2px 4px; font-size:0.78rem; font-weight:900; text-align:center;" title="عدّل متوسط الدقائق مباشرة" />
-                          <span class="chip ${tb.isMeasuredFromLogs ? 'done' : ''}" style="font-size:0.69rem; padding:1px 6px;">${ fmtMinutesAr(tb.avgTaskMinutes) } ${tb.isMeasuredFromLogs ? '📊' : '⏳'}</span>
+                          <span class="hint" style="font-size:0.72rem; font-weight:800;">⏱️ الوسيط (د):</span>
+                          <input type="number" min="5" max="600" value="${hMed.minutes}" onchange="quickUpdateCategoryTaskTypeMinutes('${safeCatJs}', '${hbEsc(tp.id)}', this.value)" style="width:62px; padding:2px 4px; font-size:0.78rem; font-weight:900; text-align:center;" title="عدّل الزمن المبدئي مباشرة" />
+                          <span class="chip ${hMed.isMeasured ? 'done' : ''}" style="font-size:0.69rem; padding:1px 6px;">${fmtMinutesAr(hMed.minutes)} ${hMed.isMeasured ? '📊' : '⏳'}</span>
                         </div>
-                        <span class="chip" style="font-size:0.71rem;">${hbEsc(effStepLbl)}: ${fmtMinutesAr(tb.avgPrimaryStepMinutes)}</span>
-                        <button type="button" class="btn btn-outline btn-sm" style="padding:3px 8px; font-size:0.72rem;" onclick="openEditCategoryTaskTypeModal('${safeCatJs}', '${hbEsc(tp.id)}')">✎ تفاصيل</button>
+                        <button type="button" class="btn btn-outline btn-sm" style="padding:3px 8px; font-size:0.72rem;" onclick="openEditCategoryTaskTypeModal('${safeCatJs}', '${hbEsc(tp.id)}')">✎</button>
                         ${(catCfg.types || []).length > 1 ? `<button type="button" class="btn btn-outline btn-sm" style="padding:3px 7px; font-size:0.72rem; color:var(--danger);" onclick="deleteCategoryTaskType('${safeCatJs}', '${hbEsc(tp.id)}')">✕</button>` : ''}
                       </div>
                     </div>
                   `;
                 }).join('')}
               </div>
+
+              ${isMed && isTreeOpen ? `
+                <div style="margin-top:12px; padding-top:12px; border-top:1.5px dashed var(--border);">
+                  <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:10px;">
+                    <div style="font-weight:900; font-size:0.82rem; margin-bottom:6px; color:var(--accent-ink);">⚡ إدخال شابتر سريع (Bulk Setup):</div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                      <input type="text" id="bulkChName_${safeId}" placeholder="اسم الشابتر (مثلاً: Cardiology)..." style="flex:1.6; min-width:150px;" />
+                      <label style="font-size:0.73rem; font-weight:800; display:inline-flex; align-items:center; gap:4px;">موديولات:
+                        <input type="number" id="bulkChMods_${safeId}" min="1" max="40" value="4" style="width:54px; text-align:center; font-weight:900;" />
+                      </label>
+                      <label style="font-size:0.73rem; font-weight:800; display:inline-flex; align-items:center; gap:4px;">دروس/موديول:
+                        <input type="number" id="bulkChLes_${safeId}" min="1" max="30" value="3" style="width:54px; text-align:center; font-weight:900;" />
+                      </label>
+                      <button type="button" class="btn btn-success btn-sm" onclick="addCurriculumChapterBulk('${safeCatJs}')">+ إنشاء الشابتر</button>
+                    </div>
+                  </div>
+
+                  ${sc.chapters.length === 0 ? `
+                    <div class="hint" style="text-align:center; padding:10px;">لا توجد شابترات بعد في «${hbEsc(c)}». أضف أول شابتر من الأعلى في ثانية واحدة.</div>
+                  ` : sc.chapters.map(ch => {
+                    const chSt = getChapterCurriculumStats(ch);
+                    const chOpen = !!(window._currExpanded && window._currExpanded['ch_' + ch.id]);
+                    const chMed = computeHierarchicalTrackMedian(c, 'lesson', ch.id);
+                    return `
+                      <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;" onclick="toggleCurriculumTreeExpand('ch_${hbEsc(ch.id)}')">
+                            <span style="font-weight:900; font-size:0.9rem;">${chOpen ? '📂' : '📁'} ${hbEsc(ch.name)}</span>
+                            <span class="chip ${chSt.pct === 100 && chSt.totalLessons > 0 ? 'done' : ''}" style="font-size:0.71rem; font-weight:900;">${chSt.doneLessons}/${chSt.totalLessons} درس (${chSt.pct}%)</span>
+                            <span class="chip" style="font-size:0.69rem;" title="وسيط الدرس في هذا الشابتر">⏱️ ${fmtMinutesAr(chMed.minutes)} ${chMed.level === 'chapter' ? '📊 شابتر' : (chMed.level === 'subject_fallback' ? '🔄 وسيط المادة' : '⏳ مبدئي')}</span>
+                          </div>
+                          <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:0.71rem;" onclick="markCurriculumChapterPreCompleted('${safeCatJs}', '${hbEsc(ch.id)}', ${chSt.doneLessons < chSt.totalLessons})">
+                              ${chSt.doneLessons < chSt.totalLessons ? '✓ منجز مسبقاً' : '↺ إعادة فتح'}
+                            </button>
+                            <button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:0.71rem;" onclick="addCurriculumModule('${safeCatJs}', '${hbEsc(ch.id)}')">+ موديول</button>
+                            <button type="button" class="btn btn-outline btn-sm" style="padding:2px 7px; font-size:0.71rem; color:var(--danger);" onclick="deleteCurriculumChapter('${safeCatJs}', '${hbEsc(ch.id)}')">🗑️</button>
+                          </div>
+                        </div>
+
+                        ${chOpen ? `
+                          <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); display:flex; flex-direction:column; gap:8px;">
+                            ${(ch.modules || []).map(mod => {
+                              const mDone = (mod.lessons || []).filter(l => l.done).length;
+                              const mTot = (mod.lessons || []).length;
+                              return `
+                                <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:8px 10px;">
+                                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                      <span style="font-weight:900; font-size:0.83rem;">📦 ${hbEsc(mod.name)}</span>
+                                      <span class="chip ${mTot > 0 && mDone === mTot ? 'done' : ''}" style="font-size:0.69rem;">${mDone}/${mTot}</span>
+                                    </div>
+                                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                      <button type="button" class="btn btn-outline btn-sm" style="padding:1px 7px; font-size:0.69rem;" onclick="markCurriculumModulePreCompleted('${safeCatJs}', '${hbEsc(ch.id)}', '${hbEsc(mod.id)}', ${mDone < mTot})">${mDone < mTot ? '✓ منجز مسبقاً' : '↺ فتح'}</button>
+                                      <button type="button" class="btn btn-outline btn-sm" style="padding:1px 7px; font-size:0.69rem;" onclick="addCurriculumLesson('${safeCatJs}', '${hbEsc(ch.id)}', '${hbEsc(mod.id)}')">+ درس</button>
+                                      <button type="button" class="btn btn-outline btn-sm" style="padding:1px 6px; font-size:0.69rem;" onclick="renameCurriculumModule('${safeCatJs}', '${hbEsc(ch.id)}', '${hbEsc(mod.id)}')">✎</button>
+                                      <button type="button" class="btn btn-outline btn-sm" style="padding:1px 6px; font-size:0.69rem; color:var(--danger);" onclick="deleteCurriculumModule('${safeCatJs}', '${hbEsc(ch.id)}', '${hbEsc(mod.id)}')">✕</button>
+                                    </div>
+                                  </div>
+                                  <div style="display:flex; flex-direction:column; gap:4px;">
+                                    ${(mod.lessons || []).map(les => `
+                                      <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:4px 8px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+                                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; flex:1; font-size:0.79rem; ${les.done ? 'text-decoration:line-through; color:var(--muted);' : 'font-weight:700;'}">
+                                          <input type="checkbox" ${les.done ? 'checked' : ''} onchange="toggleCurriculumLessonDone('${safeCatJs}', '${hbEsc(ch.id)}', '${hbEsc(mod.id)}', '${hbEsc(les.id)}', true)" style="width:15px; height:15px;" />
+                                          <span>${hbEsc(les.title)}</span>
+                                          ${les.done ? `<span class="chip done" style="font-size:0.65rem; padding:0 6px;">${les.preCompleted ? 'منجز مسبقاً' : 'مكتمل ✅'}</span>` : ''}
+                                        </label>
+                                        <div style="display:flex; gap:3px;">
+                                          <button type="button" class="substep-mini-btn" style="padding:1px 5px; font-size:0.68rem;" onclick="renameCurriculumLesson('${safeCatJs}', '${hbEsc(ch.id)}', '${hbEsc(mod.id)}', '${hbEsc(les.id)}')">✎</button>
+                                          <button type="button" class="substep-mini-btn" style="padding:1px 5px; font-size:0.68rem; color:var(--danger);" onclick="deleteCurriculumLesson('${safeCatJs}', '${hbEsc(ch.id)}', '${hbEsc(mod.id)}', '${hbEsc(les.id)}')">✕</button>
+                                        </div>
+                                      </div>
+                                    `).join('')}
+                                  </div>
+                                </div>
+                              `;
+                            }).join('')}
+                          </div>
+                        ` : ''}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              ` : ''}
             </div>
           `;
         }).join('')}
@@ -19940,10 +20668,47 @@
           ` : ''}
         </div>
 
+        ${(() => {
+          const medCatsWithCurriculum = ensureSavedTaskCategories().filter(cat => isMedicalSubjectCategory(cat) && (getSubjectCurriculum(cat).chapters || []).length > 0);
+          if (medCatsWithCurriculum.length === 0) return '';
+          return `
+            <div class="card" style="margin-bottom:14px; padding:16px 18px;">
+              <h3 style="margin:0 0 10px; font-size:1.04rem;">🗺️ خريطة الإنجاز الكلي للمواد الطبية</h3>
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                ${medCatsWithCurriculum.map(cat => {
+                  const st = getSubjectCurriculumStats(cat);
+                  const chs = getSubjectCurriculum(cat).chapters || [];
+                  return `
+                    <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:12px 14px;">
+                      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+                        <span style="font-weight:900; font-size:0.96rem;">${getTaskCategoryEmoji(cat)} ${hbEsc(cat)}</span>
+                        <span class="chip ${st.pct === 100 ? 'done' : ''}" style="font-weight:900; font-size:0.78rem;">${st.pct}% مكتمل</span>
+                      </div>
+                      <div class="thermometer-track" style="height:9px; margin:0 0 8px;">
+                        <div class="thermometer-fill" style="width:${st.pct}%;"></div>
+                      </div>
+                      <div class="hint" style="font-size:0.76rem; margin-bottom:6px;">
+                        المتبقي لإنهاء المادة: <strong>${st.remChapters} شابتر</strong> • <strong>${st.remModules} موديول</strong> • <strong>${st.remLessons} درس</strong> (أنجزت ${st.doneLessons} من ${st.totalLessons} درس)
+                      </div>
+                      <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                        ${chs.map(ch => {
+                          const cst = getChapterCurriculumStats(ch);
+                          return `<span class="chip ${cst.pct === 100 ? 'done' : ''}" style="font-size:0.71rem;">📑 ${hbEsc(ch.name)}: ${cst.pct}% (متبقٍ ${cst.remLessons})</span>`;
+                        }).join('')}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        })()}
+
         <div>
           ${catList.map(c => {
             const safeCatJs = hbEsc(c.category.replace(/'/g, "\'"));
             const typeList = Object.values(c.byType || {});
+            const isMed = isMedicalSubjectCategory(c.category);
             return `
               <div class="compass-cat-card">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
@@ -19954,27 +20719,30 @@
                       <span class="hint" style="font-size:0.74rem;">إجمالي المسجل: <strong>${fmtMinutesAr(c.totalMinutes)}</strong> • مكتمل: ${c.completedTasksCount}</span>
                     </div>
                   </div>
-                  <span class="chip" style="font-size:0.72rem;">🌿 ${hbEsc(c.stepLabel || 'Step')}</span>
+                  <span class="chip ${isMed ? 'done' : ''}" style="font-size:0.72rem;">${isMed ? '🩺 مادة طبية (4 مسارات)' : '📁 تصنيف عام'}</span>
                 </div>
 
                 <div class="compass-metrics-grid">
-                  ${typeList.map(tb => `
-                    <div class="compass-metric-box" style="display:flex; flex-direction:column; justify-content:space-between; gap:6px;">
-                      <div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
-                          <span class="lbl" style="font-weight:900; color:var(--text);">${tb.emoji} ${hbEsc(tb.name)}</span>
-                          <button type="button" class="substep-mini-btn" style="padding:1px 6px; font-size:0.68rem;" onclick="promptManualCategoryEstimate('${safeCatJs}', '${hbEsc(tb.typeId)}')">⚙️ ضبط</button>
+                  ${typeList.map(tb => {
+                    const hMed = computeHierarchicalTrackMedian(c.category, tb.typeId, null);
+                    return `
+                      <div class="compass-metric-box" style="display:flex; flex-direction:column; justify-content:space-between; gap:6px;">
+                        <div>
+                          <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
+                            <span class="lbl" style="font-weight:900; color:var(--text);">${tb.emoji} ${hbEsc(tb.name)}</span>
+                            <button type="button" class="substep-mini-btn" style="padding:1px 6px; font-size:0.68rem;" onclick="promptManualCategoryEstimate('${safeCatJs}', '${hbEsc(tb.typeId)}')">⚙️ ضبط</button>
+                          </div>
+                          <div class="val" style="margin-top:4px;">
+                            ${fmtMinutesAr(hMed.minutes)}
+                            ${tb.unitLabel ? `<small class="hint" style="font-size:0.7rem;">/ ${hbEsc(tb.unitLabel)}</small>` : ''}
+                          </div>
                         </div>
-                        <div class="val" style="margin-top:4px;">
-                          ${fmtMinutesAr(tb.avgTaskMinutes)}
-                          ${tb.unitLabel ? `<small class="hint" style="font-size:0.7rem;">/ ${hbEsc(tb.unitLabel)}</small>` : ''}
+                        <div class="hint" style="font-size:0.71rem; border-top:1px dashed var(--border); padding-top:4px;">
+                          ${hMed.isMeasured ? `📊 وسيط مقاس (${hMed.sampleCount} جلسة/مهمة)` : '⏳ تقدير مبدئي'}
                         </div>
                       </div>
-                      <div class="hint" style="font-size:0.71rem; border-top:1px dashed var(--border); padding-top:4px;">
-                        🌿 متوسط الـ ${hbEsc(tb.stepLabel || 'Step')}: <strong>${fmtMinutesAr(tb.avgPrimaryStepMinutes)}</strong> • ${tb.isMeasuredFromLogs ? '📊 محسوب من سجلاتك' : '⏳ تقدير مبدئي'}
-                      </div>
-                    </div>
-                  `).join('')}
+                    `;
+                  }).join('')}
                 </div>
               </div>
             `;
@@ -20855,20 +21623,56 @@
       const tpObj = getTaskTypeObj(catName, typeId);
       const unitLbl = getEffectiveUnitLabel(tpObj);
       const labelForTitle = unitLbl || tpObj.name;
-      const existingCount = (state.studyTasks || []).filter(t => t && t.weekSunday === targetSun && t.category === catName && (t.taskTypeId || getDefaultTaskTypeIdForCategory(catName)) === tpObj.id).length;
-      for (let i = 1; i <= n; i++) {
-        state.studyTasks.push({
-          id: 'st_' + Date.now() + '_' + i + '_' + Math.floor(Math.random() * 1000),
-          title: `${catName} — ${labelForTitle} #${existingCount + i}`,
-          category: catName,
-          taskTypeId: tpObj.id,
-          stars: 3,
-          weekSunday: targetSun,
-          done: false,
-          completedAt: null,
-          subSteps: []
+      const isMed = isMedicalSubjectCategory(catName);
+      const sc = isMed ? getSubjectCurriculum(catName) : null;
+      const chCfg = (isMed && sc && sc.chapters.length > 0) ? ensureCategoryAdvisorChaptersConfig(catName) : null;
+      const selChs = (chCfg && sc) ? sc.chapters.filter(c => chCfg.selected[c.id]) : [];
+
+      let addedCount = 0;
+      if (isMed && tpObj.id === 'lesson' && selChs.length > 0) {
+        // التخطيط التسلسلي التلقائي (Auto-Sequencing) مع احترام حد الشابتر (Chapter Overflow)
+        const seqPlan = buildAutoSequencedLessonPlan(catName, targetSun, n * 600, true);
+        const picks = (seqPlan ? seqPlan.plannedLessons : []).slice(0, n);
+        picks.forEach((p, idx) => {
+          state.studyTasks.push({
+            id: 'st_' + Date.now() + '_' + idx + '_' + Math.floor(Math.random() * 1000),
+            title: p.fullTitle,
+            category: catName,
+            taskTypeId: 'lesson',
+            chapterId: p.chapterId,
+            moduleId: p.moduleId,
+            lessonId: p.lessonId,
+            stars: 3,
+            weekSunday: targetSun,
+            done: false,
+            completedAt: null,
+            subSteps: []
+          });
+          addedCount++;
         });
+        if (addedCount === 0) {
+          return showAppToast(`🎉 كل دروس الشابترات المختارة في «${catName}» مكتملة أو مضافة بالفعل لهذا الأسبوع!`);
+        }
+      } else {
+        const existingCount = (state.studyTasks || []).filter(t => t && t.weekSunday === targetSun && t.category === catName && (t.taskTypeId || getDefaultTaskTypeIdForCategory(catName)) === tpObj.id).length;
+        for (let i = 1; i <= n; i++) {
+          const chObj = selChs.length > 0 ? selChs[(i - 1) % selChs.length] : null;
+          state.studyTasks.push({
+            id: 'st_' + Date.now() + '_' + i + '_' + Math.floor(Math.random() * 1000),
+            title: chObj ? `${chObj.name} — ${labelForTitle} #${existingCount + i}` : `${catName} — ${labelForTitle} #${existingCount + i}`,
+            category: catName,
+            taskTypeId: tpObj.id,
+            chapterId: chObj ? chObj.id : null,
+            stars: 3,
+            weekSunday: targetSun,
+            done: false,
+            completedAt: null,
+            subSteps: []
+          });
+          addedCount++;
+        }
       }
+
       saveCurrentAdvisorSnapshotAsSuggestion();
       saveState();
       if (!stayOnAdvisorPage) {
@@ -20876,7 +21680,7 @@
         switchTasksInnerSubPage('week');
       }
       renderAll();
-      showAppToast(`🚀 تمت إضافة (${n}${unitLbl ? ' ' + unitLbl : ''}) من «${tpObj.name}» في تصنيف «${catName}» للأسبوع!`);
+      showAppToast(`🚀 تمت إضافة (${addedCount}${unitLbl ? ' ' + unitLbl : ''}) من «${tpObj.name}» في «${catName}» للأسبوع!`);
     }
 
     function applyAllAdvisorRecommendationsToWeek() {
@@ -20923,21 +21727,49 @@
           const titleOffset = allWeekTasksRaw.filter(t => (t.category || 'عام') === cat && (t.taskTypeId || defaultTypeId) === it.tp.id).length;
           const toAdd = (cfg.advisorSubtractExistingTasks !== false) ? it.remainingToAddUnits : it.recUnits;
           if (toAdd > 0) {
-            const unitLbl = getEffectiveUnitLabel(it.tp);
-            const labelForTitle = unitLbl || it.tp.name;
-            for (let i = 1; i <= toAdd; i++) {
-              state.studyTasks.push({
-                id: 'st_' + Date.now() + '_' + totalAddedTasks + '_' + i + '_' + Math.floor(Math.random() * 1000),
-                title: `${cat} — ${labelForTitle} #${titleOffset + i}`,
-                category: cat,
-                taskTypeId: it.tp.id,
-                stars: 3,
-                weekSunday: targetSun,
-                done: false,
-                completedAt: null,
-                subSteps: []
+            const isMed = isMedicalSubjectCategory(cat);
+            const sc = isMed ? getSubjectCurriculum(cat) : null;
+            const chCfg = (isMed && sc && sc.chapters.length > 0) ? ensureCategoryAdvisorChaptersConfig(cat) : null;
+            const selChs = (chCfg && sc) ? sc.chapters.filter(c => chCfg.selected[c.id]) : [];
+            if (isMed && it.tp.id === 'lesson' && selChs.length > 0) {
+              const seqPlan = buildAutoSequencedLessonPlan(cat, targetSun, it.tpMin, cfg.advisorSubtractExistingTasks !== false);
+              const picks = seqPlan ? seqPlan.plannedLessons : [];
+              picks.forEach((p, idx) => {
+                state.studyTasks.push({
+                  id: 'st_' + Date.now() + '_' + totalAddedTasks + '_' + idx + '_' + Math.floor(Math.random() * 1000),
+                  title: p.fullTitle,
+                  category: cat,
+                  taskTypeId: 'lesson',
+                  chapterId: p.chapterId,
+                  moduleId: p.moduleId,
+                  lessonId: p.lessonId,
+                  stars: 3,
+                  weekSunday: targetSun,
+                  done: false,
+                  completedAt: null,
+                  subSteps: []
+                });
+                totalAddedTasks++;
               });
-              totalAddedTasks++;
+            } else {
+              const unitLbl = getEffectiveUnitLabel(it.tp);
+              const labelForTitle = unitLbl || it.tp.name;
+              for (let i = 1; i <= toAdd; i++) {
+                const chObj = selChs.length > 0 ? selChs[(i - 1) % selChs.length] : null;
+                state.studyTasks.push({
+                  id: 'st_' + Date.now() + '_' + totalAddedTasks + '_' + i + '_' + Math.floor(Math.random() * 1000),
+                  title: chObj ? `${chObj.name} — ${labelForTitle} #${titleOffset + i}` : `${cat} — ${labelForTitle} #${titleOffset + i}`,
+                  category: cat,
+                  taskTypeId: it.tp.id,
+                  chapterId: chObj ? chObj.id : null,
+                  stars: 3,
+                  weekSunday: targetSun,
+                  done: false,
+                  completedAt: null,
+                  subSteps: []
+                });
+                totalAddedTasks++;
+              }
             }
           }
         });
@@ -21065,12 +21897,32 @@ ${plan.leftoverSurplusMin >= 15 ? `
                             <span class="chip" style="font-size:0.72rem;">حصة الزمن: ${it.tpTimeSharePct}% (${fmtMinutesAr(it.tpMin)})</span>
                             <span class="hint" style="font-size:0.72rem;">زمن الواحدة${unitLbl ? ` (${hbEsc(unitLbl)})` : ''}: <strong>${fmtMinutesAr(it.unitMin)}</strong>${(cfg.advisorShowRange !== false && it.tb && it.tb.p80TaskMinutes && it.tb.p80TaskMinutes > it.unitMin) ? ` <small>(الأبطأ المعتاد 80%: ${fmtMinutesAr(it.tb.p80TaskMinutes)})</small>` : ''}</span>
                           </div>
-                          <div style="margin-top:6px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:0.86rem; font-weight:900; color:var(--accent-ink);">
-                            <span>🎯 المقترح للأسبوع: ${it.recUnits}${unitLbl ? ' ' + hbEsc(unitLbl) : ''} <small class="hint" style="font-weight:700;">(الدقيق: ${it.exactUnits.toFixed(1)} • يستهلك ${fmtMinutesAr(it.actualTasksTimeMin)})</small></span>
-                            <span style="color:var(--muted);">•</span>
-                            <span style="color:var(--green-ink);">🌿 أو ما يعادل: ${it.recSteps} ${hbEsc(stepLbl)}</span>
-                            ${it.existingCount > 0 ? `<span class="chip done" style="font-size:0.71rem;">مضاف حالياً: ${it.existingCount} (${fmtMinutesAr(it.existingMin)})</span>` : ''}
-                          </div>
+                          ${(() => {
+                            const seqPlan = (isMedicalSubjectCategory(cat) && tp.id === 'lesson')
+                              ? buildAutoSequencedLessonPlan(cat, targetSun, it.tpMin, subtractExisting)
+                              : null;
+                            if (seqPlan) {
+                              const effCount = seqPlan.plannedLessons.length;
+                              const overflowHtml = seqPlan.overflowChapters.length > 0
+                                ? `<div style="margin-top:4px;"><span class="chip done" style="font-size:0.72rem; background:rgba(16,185,129,0.16); color:var(--green-ink);">🎉 سيكتمل شابتر (${seqPlan.overflowChapters.map(hbEsc).join('، ')}) بنسبة 100%!${seqPlan.surplusMin >= 15 ? ` • فائض حر متبقٍ: ${fmtMinutesAr(seqPlan.surplusMin)}` : ''}</span></div>`
+                                : '';
+                              const previewList = seqPlan.plannedLessons.slice(0, 4).map(l => hbEsc(l.fullTitle)).join(' ← ');
+                              return `
+                                <div style="margin-top:6px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:0.86rem; font-weight:900; color:var(--accent-ink);">
+                                  <span>🎯 المقترح التسلسلي: ${effCount} درس <small class="hint" style="font-weight:700;">(يستهلك ${fmtMinutesAr(seqPlan.usedMin)})</small></span>
+                                  ${it.existingCount > 0 ? `<span class="chip done" style="font-size:0.71rem;">مضاف حالياً: ${it.existingCount}</span>` : ''}
+                                </div>
+                                ${previewList ? `<div class="hint" style="font-size:0.73rem; margin-top:4px;">📌 التسلسل القادم: <strong>${previewList}${seqPlan.plannedLessons.length > 4 ? ` ... (+${seqPlan.plannedLessons.length - 4})` : ''}</strong></div>` : `<div class="hint" style="font-size:0.73rem; margin-top:4px;">✅ لا توجد دروس متبقية غير مجدولة في الشابترات المختارة.</div>`}
+                                ${overflowHtml}
+                              `;
+                            }
+                            return `
+                              <div style="margin-top:6px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:0.86rem; font-weight:900; color:var(--accent-ink);">
+                                <span>🎯 المقترح للأسبوع: ${it.recUnits}${unitLbl ? ' ' + hbEsc(unitLbl) : ''} <small class="hint" style="font-weight:700;">(الدقيق: ${it.exactUnits.toFixed(1)} • يستهلك ${fmtMinutesAr(it.actualTasksTimeMin)})</small></span>
+                                ${it.existingCount > 0 ? `<span class="chip done" style="font-size:0.71rem;">مضاف حالياً: ${it.existingCount} (${fmtMinutesAr(it.existingMin)})</span>` : ''}
+                              </div>
+                            `;
+                          })()}
                         </div>
                         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                           ${btnCount > 0 ? `
@@ -21312,9 +22164,41 @@ ${plan.leftoverSurplusMin >= 15 ? `
                     </label>
                   </div>
 
+                  ${(() => {
+                    if (!isMedicalSubjectCategory(c)) return '';
+                    const chs = getSubjectCurriculum(c).chapters || [];
+                    if (chs.length === 0) return `<div class="hint" style="font-size:0.73rem; margin-bottom:8px;">💡 أضف شابترات «${hbEsc(c)}» من صفحة «التصنيفات وشجرة المنهج» لتفعيل التخطيط التسلسلي التلقائي.</div>`;
+                    const chCfg = ensureCategoryAdvisorChaptersConfig(c);
+                    const selChs = chs.filter(ch => chCfg.selected[ch.id]);
+                    return `
+                      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:11px; padding:9px 11px; margin-bottom:8px;">
+                        <div style="font-size:0.76rem; font-weight:900; color:var(--accent-ink); margin-bottom:6px;">🌳 اختر الشابترات المستهدفة وموازنة النسبة بينها (Auto-Sequencing):</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:${selChs.length > 1 ? '8px' : '0'};">
+                          ${chs.map(ch => {
+                            const isChSel = !!chCfg.selected[ch.id];
+                            const cst = getChapterCurriculumStats(ch);
+                            const chMed = computeHierarchicalTrackMedian(c, 'lesson', ch.id);
+                            return `<button type="button" class="cat-quick-chip ${isChSel ? 'active' : ''}" style="font-size:0.73rem; padding:3px 9px;" onclick="toggleAdvisorChapterSelection('${safeCatJs}', '${hbEsc(ch.id)}')">📑 ${hbEsc(ch.name)} (متبقٍ ${cst.remLessons} • ${fmtMinutesAr(chMed.minutes)}) ${isChSel ? '✓' : '+'}</button>`;
+                          }).join('')}
+                        </div>
+                        ${selChs.length > 1 ? `
+                          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding-top:6px; border-top:1px dashed var(--border);">
+                            <span class="hint" style="font-size:0.72rem; font-weight:800;">⚖️ نسبة الشابترات:</span>
+                            ${selChs.map(ch => `
+                              <div style="display:inline-flex; align-items:center; gap:5px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:2px 8px;">
+                                <span style="font-size:0.74rem; font-weight:800;">${hbEsc(ch.name)}:</span>
+                                <input type="number" min="1" max="20" value="${chCfg.ratios[ch.id] || 1}" onchange="updateAdvisorChapterRatio('${safeCatJs}', '${hbEsc(ch.id)}', this.value)" style="width:46px; text-align:center; font-weight:900; padding:2px;" />
+                              </div>
+                            `).join('')}
+                          </div>
+                        ` : ''}
+                      </div>
+                    `;
+                  })()}
+
                   <div class="advisor-type-box">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
-                      <span class="hint" style="font-size:0.76rem; font-weight:800; color:var(--text);">🎯 اختر أنواع المهام المطلوبة في «${hbEsc(c)}» هذا الأسبوع:</span>
+                      <span class="hint" style="font-size:0.76rem; font-weight:800; color:var(--text);">🎯 اختر المسارات المطلوبة في «${hbEsc(c)}» هذا الأسبوع:</span>
                       ${activeTypes.length > 1 ? `
                         <div style="display:flex; gap:4px;">
                           <button type="button" class="btn btn-sm ${isRatio ? 'btn-primary' : 'btn-outline'}" style="padding:2px 8px; font-size:0.71rem;" onclick="setAdvisorTaskTypeSplitMode('${safeCatJs}', 'ratio')">⚖️ نسبة عدد المهام (Ratio مثل 1:1 أو 2:1)</button>
@@ -21429,7 +22313,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
     'taskCategoryEmojis', 'lastStreakResetDate', 'lastStreakResetTimestamp',
     'checkinAfterReset', 'habitCheckinAfterReset', 'hopeCounter', 'newYear2027EmergencyNoticeAck',
     'savedTaskCategories', 'deletedSavedCategories', 'weeklyFixedQuotas', 'tbObligations',
-    'planningAnalyticsConfig', 'planningCalibrationStartDate', 'categoryTaskTypesConfig'
+    'planningAnalyticsConfig', 'planningCalibrationStartDate', 'categoryTaskTypesConfig', 'medicalCurriculum'
   ];
 
   // ---------- أدوات ----------
