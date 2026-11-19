@@ -24927,27 +24927,6 @@ ${plan.leftoverSurplusMin >= 15 ? `
   let isApplyingRemote = false;
   let pushTimer = null;
   let eventSource = null;
-  let pendingReload = false;
-  let lastSyncedDigest = '';
-
-  function normalizeForDiff(dataObj) {
-    const out = {};
-    Object.keys(dataObj || {}).sort().forEach(k => {
-      const raw = dataObj[k];
-      if (k === 'habitico_production_v1' && typeof raw === 'string') {
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') {
-            delete parsed.highestTimestamp;
-            out[k] = JSON.stringify(parsed);
-            return;
-          }
-        } catch (e) {}
-      }
-      out[k] = raw;
-    });
-    return JSON.stringify(out);
-  }
 
   function getCfg() {
     try {
@@ -24969,7 +24948,8 @@ ${plan.leftoverSurplusMin >= 15 ? `
   function getEndpoint(cfg) {
     if (!cfg.url || !cfg.secret) return null;
     const base = cfg.url.trim().replace(/\/+$/, '');
-    const room = encodeURIComponent(cfg.secret.trim());
+    const cleanRoom = cfg.secret.trim().replace(/[.#$\[\]\/]/g, '_');
+    const room = encodeURIComponent(cleanRoom);
     return `${base}/habitico_rooms/${room}.json`;
   }
 
@@ -24991,23 +24971,17 @@ ${plan.leftoverSurplusMin >= 15 ? `
     fab.textContent = text;
   }
 
-  async function pushToFirebase(forcePush) {
+  async function pushToFirebase() {
     const cfg = getCfg();
     const endpoint = getEndpoint(cfg);
     if (!endpoint || isApplyingRemote) return;
-
-    const currentData = getAllAppData();
-    const currentDigest = normalizeForDiff(currentData);
-    if (!forcePush && lastSyncedDigest && currentDigest === lastSyncedDigest) {
-      return;
-    }
 
     setFabState('syncing', '⏳ جاري الرفع...');
     const now = Date.now();
     const body = {
       updatedAt: now,
       deviceId: cfg.deviceId,
-      payload: currentData
+      payloadStr: JSON.stringify(getAllAppData())
     };
 
     try {
@@ -25019,10 +24993,9 @@ ${plan.leftoverSurplusMin >= 15 ? `
       if (res.ok) {
         cfg.lastTs = now;
         saveCfg(cfg);
-        lastSyncedDigest = currentDigest;
         setFabState('connected', '🟢 متزامن');
       } else {
-        setFabState('', '⚠️ خطأ مزامنة');
+        setFabState('', `⚠️ خطأ ${res.status}`);
       }
     } catch (err) {
       setFabState('', '📴 أوفلاين');
@@ -25056,14 +25029,17 @@ ${plan.leftoverSurplusMin >= 15 ? `
     if (remote.deviceId === cfg.deviceId) return;
     if (!remote.updatedAt || remote.updatedAt <= (cfg.lastTs || 0)) return;
 
-    const remotePayload = remote.payload || {};
+    let remotePayload = {};
+    if (typeof remote.payloadStr === 'string') {
+      try { remotePayload = JSON.parse(remote.payloadStr); } catch (e) { return; }
+    } else if (remote.payload && typeof remote.payload === 'object') {
+      remotePayload = remote.payload;
+    }
+
     const currentPayload = getAllAppData();
-    const remoteDigest = normalizeForDiff(remotePayload);
-    const currentDigest = normalizeForDiff(currentPayload);
-    if (remoteDigest === currentDigest) {
+    if (JSON.stringify(remotePayload) === JSON.stringify(currentPayload)) {
       cfg.lastTs = remote.updatedAt;
       saveCfg(cfg);
-      lastSyncedDigest = currentDigest;
       return;
     }
 
@@ -25081,11 +25057,9 @@ ${plan.leftoverSurplusMin >= 15 ? `
       isApplyingRemote = false;
     }
 
-    lastSyncedDigest = remoteDigest;
     const active = document.activeElement;
     const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
     if (isTyping) {
-      pendingReload = true;
       setFabState('connected', '🔄 اضغط لتحديث الشاشة');
     } else {
       location.reload();
@@ -25127,10 +25101,6 @@ ${plan.leftoverSurplusMin >= 15 ? `
   }
 
   window.openFbSyncModal = function() {
-    if (pendingReload) {
-      location.reload();
-      return;
-    }
     const cfg = getCfg();
     document.getElementById('fbUrlInput').value = cfg.url || '';
     document.getElementById('fbSecretInput').value = cfg.secret || '';
@@ -25153,7 +25123,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
 
   window.forcePushToFb = function() {
     closeFbSyncModal();
-    pushToFirebase(true);
+    pushToFirebase();
   };
 
   window.addEventListener('online', () => {
@@ -25161,7 +25131,6 @@ ${plan.leftoverSurplusMin >= 15 ? `
     startRealtimeStream();
   });
 
-  lastSyncedDigest = normalizeForDiff(getAllAppData());
   startRealtimeStream();
 })();
 </script>
