@@ -24927,6 +24927,27 @@ ${plan.leftoverSurplusMin >= 15 ? `
   let isApplyingRemote = false;
   let pushTimer = null;
   let eventSource = null;
+  let pendingReload = false;
+  let lastSyncedDigest = '';
+
+  function normalizeForDiff(dataObj) {
+    const out = {};
+    Object.keys(dataObj || {}).sort().forEach(k => {
+      const raw = dataObj[k];
+      if (k === 'habitico_production_v1' && typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            delete parsed.highestTimestamp;
+            out[k] = JSON.stringify(parsed);
+            return;
+          }
+        } catch (e) {}
+      }
+      out[k] = raw;
+    });
+    return JSON.stringify(out);
+  }
 
   function getCfg() {
     try {
@@ -24971,17 +24992,23 @@ ${plan.leftoverSurplusMin >= 15 ? `
     fab.textContent = text;
   }
 
-  async function pushToFirebase() {
+  async function pushToFirebase(forcePush) {
     const cfg = getCfg();
     const endpoint = getEndpoint(cfg);
     if (!endpoint || isApplyingRemote) return;
+
+    const currentData = getAllAppData();
+    const currentDigest = normalizeForDiff(currentData);
+    if (!forcePush && lastSyncedDigest && currentDigest === lastSyncedDigest) {
+      return;
+    }
 
     setFabState('syncing', '⏳ جاري الرفع...');
     const now = Date.now();
     const body = {
       updatedAt: now,
       deviceId: cfg.deviceId,
-      payloadStr: JSON.stringify(getAllAppData())
+      payloadStr: JSON.stringify(currentData)
     };
 
     try {
@@ -24993,6 +25020,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
       if (res.ok) {
         cfg.lastTs = now;
         saveCfg(cfg);
+        lastSyncedDigest = currentDigest;
         setFabState('connected', '🟢 متزامن');
       } else {
         setFabState('', `⚠️ خطأ ${res.status}`);
@@ -25031,15 +25059,22 @@ ${plan.leftoverSurplusMin >= 15 ? `
 
     let remotePayload = {};
     if (typeof remote.payloadStr === 'string') {
-      try { remotePayload = JSON.parse(remote.payloadStr); } catch (e) { return; }
+      try {
+        const parsed = JSON.parse(remote.payloadStr);
+        if (parsed && typeof parsed === 'object') remotePayload = parsed;
+      } catch (e) {
+        return;
+      }
     } else if (remote.payload && typeof remote.payload === 'object') {
       remotePayload = remote.payload;
     }
-
     const currentPayload = getAllAppData();
-    if (JSON.stringify(remotePayload) === JSON.stringify(currentPayload)) {
+    const remoteDigest = normalizeForDiff(remotePayload);
+    const currentDigest = normalizeForDiff(currentPayload);
+    if (remoteDigest === currentDigest) {
       cfg.lastTs = remote.updatedAt;
       saveCfg(cfg);
+      lastSyncedDigest = currentDigest;
       return;
     }
 
@@ -25057,9 +25092,11 @@ ${plan.leftoverSurplusMin >= 15 ? `
       isApplyingRemote = false;
     }
 
+    lastSyncedDigest = remoteDigest;
     const active = document.activeElement;
     const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
     if (isTyping) {
+      pendingReload = true;
       setFabState('connected', '🔄 اضغط لتحديث الشاشة');
     } else {
       location.reload();
@@ -25087,7 +25124,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
         setFabState('connected', '🟢 متزامن');
         if (msg.path === '/') {
           if (msg.data === null && Object.keys(getAllAppData()).length > 0) {
-            pushToFirebase();
+            pushToFirebase(true);
           } else if (msg.data) {
             applyRemoteSnapshot(msg.data);
           }
@@ -25101,6 +25138,10 @@ ${plan.leftoverSurplusMin >= 15 ? `
   }
 
   window.openFbSyncModal = function() {
+    if (pendingReload) {
+      location.reload();
+      return;
+    }
     const cfg = getCfg();
     document.getElementById('fbUrlInput').value = cfg.url || '';
     document.getElementById('fbSecretInput').value = cfg.secret || '';
@@ -25123,7 +25164,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
 
   window.forcePushToFb = function() {
     closeFbSyncModal();
-    pushToFirebase();
+    pushToFirebase(true);
   };
 
   window.addEventListener('online', () => {
@@ -25131,6 +25172,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
     startRealtimeStream();
   });
 
+  lastSyncedDigest = normalizeForDiff(getAllAppData());
   startRealtimeStream();
 })();
 </script>
