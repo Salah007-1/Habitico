@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="color-scheme" content="light" />
-  <meta name="theme-color" content="#f4f5fb" />
+  <meta name="theme-color" content="#f2f4f9" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -4514,6 +4514,810 @@
       vertical-align: middle;
     }
 
+
+    /* ==================== نظام الأوسمة والتحديات والخبرة والألقاب (Badges & XP Ranks) ==================== */
+    .xp-rank-hero-card {
+      background: linear-gradient(135deg, rgba(91,91,240,0.12), rgba(245,158,11,0.09) 55%, var(--surface) 100%);
+      border: 1.5px solid var(--accent);
+      border-radius: 18px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .xp-progress-track {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin: 8px 0 6px;
+    }
+    .xp-progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), #f59e0b);
+      transition: width 0.4s var(--ease);
+    }
+    .badges-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+      gap: 11px;
+    }
+    .badge-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 15px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease);
+    }
+    .badge-card.unlocked { box-shadow: var(--shadow-sm); }
+    .badge-card.locked { opacity: 0.78; background: var(--surface-2); }
+    .badge-card.tier-bronze.unlocked { border-color: #cd7f32; background: linear-gradient(145deg, rgba(205,127,50,0.10), var(--surface) 60%); }
+    .badge-card.tier-silver.unlocked { border-color: #94a3b8; background: linear-gradient(145deg, rgba(148,163,184,0.14), var(--surface) 60%); }
+    .badge-card.tier-gold.unlocked { border-color: #f59e0b; background: linear-gradient(145deg, rgba(245,158,11,0.14), var(--surface) 60%); }
+    .badge-card.tier-legendary.unlocked { border-color: #8b5cf6; background: linear-gradient(145deg, rgba(139,92,246,0.16), rgba(245,158,11,0.08) 55%, var(--surface) 100%); }
+    .badge-icon-orb {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.55rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .badge-card.unlocked .badge-icon-orb {
+      background: var(--surface);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+    }
+    .badge-mini-bar {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .badge-mini-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+    .badge-card.unlocked .badge-mini-fill { background: var(--green); }
+    .header-rank-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+      background: linear-gradient(135deg, rgba(91,91,240,0.10), rgba(245,158,11,0.08));
+      color: var(--text);
+      font-size: 0.79rem;
+      font-weight: 900;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .header-rank-pill:hover { filter: brightness(0.97); }
+
+  
+/* ==================== HABITICO STUDIO DESIGN SYSTEM V2 ==================== */
+:root {
+  --bg: #f2f4f9;
+  --surface: #ffffff;
+  --surface-2: #f6f8fc;
+  --surface-3: #edf1f8;
+  --card: var(--surface);
+  --text: #0f172a;
+  --text-soft: #334155;
+  --muted: #64748b;
+  --border: rgba(15, 23, 42, 0.085);
+  --border-strong: rgba(15, 23, 42, 0.14);
+
+  --accent: #4f46e5;
+  --accent-2: #7c3aed;
+  --accent-ink: #3730a3;
+  --accent-light: rgba(79, 70, 229, 0.11);
+
+  --green: #059669;
+  --green-ink: #065f46;
+  --green-light: rgba(5, 150, 105, 0.11);
+
+  --red: #e11d48;
+  --red-ink: #9f1239;
+  --red-light: rgba(225, 29, 72, 0.10);
+
+  --amber: #d97706;
+  --amber-ink: #92400e;
+  --amber-light: rgba(217, 119, 6, 0.13);
+
+  --orange: #ea580c;
+  --gold-grad: linear-gradient(135deg, #f59e0b 0%, #d97706 55%, #b45309 100%);
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.045), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 10px 28px -6px rgba(15, 23, 42, 0.09), 0 4px 12px -4px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 22px 50px -12px rgba(15, 23, 42, 0.16), 0 8px 20px -6px rgba(15, 23, 42, 0.08);
+  --radius: 20px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #080c16;
+    --surface: #111827;
+    --surface-2: #182135;
+    --surface-3: #1f2a42;
+    --text: #f1f5f9;
+    --text-soft: #cbd5e1;
+    --muted: #94a3b8;
+    --border: rgba(148, 163, 184, 0.13);
+    --border-strong: rgba(148, 163, 184, 0.22);
+
+    --accent: #6366f1;
+    --accent-2: #8b5cf6;
+    --accent-ink: #c7d2fe;
+    --accent-light: rgba(99, 102, 241, 0.18);
+
+    --green: #10b981;
+    --green-ink: #6ee7b7;
+    --green-light: rgba(16, 185, 129, 0.16);
+
+    --red: #f43f5e;
+    --red-ink: #fda4af;
+    --red-light: rgba(244, 63, 94, 0.16);
+
+    --amber: #f59e0b;
+    --amber-ink: #fcd34d;
+    --amber-light: rgba(245, 158, 11, 0.16);
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-sm: 0 3px 10px rgba(0, 0, 0, 0.38);
+    --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.65);
+  }
+}
+
+/* Global Typography & Ambient Mesh Canvas */
+body {
+  font-family: 'SF Pro Arabic', 'Segoe UI', 'Tajawal', 'Cairo', Tahoma, system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+}
+
+body::before {
+  background:
+    radial-gradient(960px 460px at 88% -8%, rgba(79, 70, 229, 0.10), transparent 62%),
+    radial-gradient(760px 420px at 6% 4%, rgba(16, 185, 129, 0.065), transparent 60%),
+    radial-gradient(640px 360px at 50% 100%, rgba(124, 58, 237, 0.05), transparent 65%);
+}
+
+/* ============================================================
+   1. Flagship Glassmorphic Header & Unified Action Pills
+   ============================================================ */
+header {
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 24px 12px;
+  box-shadow: var(--shadow-xs);
+}
+
+.brand-wrap {
+  gap: 13px;
+}
+
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.app-title {
+  font-size: 1.32rem;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  background: linear-gradient(135deg, var(--text) 30%, var(--accent-ink) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+header > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.header-rank-pill,
+.header-niyyah-btn,
+.overall-streak-box {
+  height: 38px;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center;
+  gap: 6px !important;
+  font-size: 0.82rem !important;
+  font-weight: 800 !important;
+  line-height: 1;
+  white-space: nowrap;
+  transition: transform 0.18s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.header-rank-pill {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(124, 58, 237, 0.14)) !important;
+  border: 1px solid rgba(79, 70, 229, 0.28) !important;
+  color: var(--accent-ink) !important;
+  box-shadow: var(--shadow-xs);
+}
+.header-rank-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -4px rgba(79, 70, 229, 0.25);
+  border-color: rgba(79, 70, 229, 0.45) !important;
+}
+
+.header-niyyah-btn {
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.11), rgba(16, 185, 129, 0.14)) !important;
+  border: 1px solid rgba(5, 150, 105, 0.28) !important;
+  color: var(--green-ink) !important;
+  box-shadow: var(--shadow-xs);
+}
+.header-niyyah-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -4px rgba(5, 150, 105, 0.24);
+  border-color: rgba(5, 150, 105, 0.48) !important;
+}
+
+.overall-streak-box {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(234, 88, 12, 0.12)) !important;
+  border: 1px solid rgba(234, 88, 12, 0.30) !important;
+  color: var(--orange) !important;
+  box-shadow: var(--shadow-xs);
+}
+.overall-streak-box #overallStreakNum {
+  font-size: 1.05rem !important;
+  font-weight: 900 !important;
+}
+
+/* ============================================================
+   2. Main Floating Segmented Tab Bar (All 8 Tabs)
+   ============================================================ */
+.tabs-nav {
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 18px;
+  gap: 6px;
+}
+
+@media (min-width: 1040px) {
+  .tabs-nav {
+    justify-content: center;
+  }
+}
+
+.tab-btn {
+  height: 40px;
+  padding: 0 15px;
+  border-radius: 12px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s var(--ease);
+}
+
+.tab-btn:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border-color: var(--border);
+}
+
+.tab-btn.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 20px -6px rgba(79, 70, 229, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  transform: translateY(-0.5px);
+}
+
+.container {
+  max-width: 1120px;
+  margin: 22px auto;
+  padding: 0 18px;
+}
+
+/* ============================================================
+   3. Elevated Cards, Banners & Unified Controls
+   ============================================================ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.24s var(--ease), border-color 0.24s var(--ease);
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+}
+
+.card h3 {
+  font-size: 1.06rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.25px;
+}
+
+.card h4 {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.hint {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* Unified Buttons with Crisp Alignment & Tactile Polish */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  transition: transform 0.16s var(--ease), box-shadow 0.2s var(--ease), filter 0.18s var(--ease), background 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+
+.btn-sm {
+  min-height: 33px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+  border-radius: 10px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 16px -4px rgba(79, 70, 229, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+.btn-primary:hover {
+  box-shadow: 0 10px 22px -4px rgba(79, 70, 229, 0.50), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 16px -4px rgba(5, 150, 105, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 16px -4px rgba(225, 29, 72, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-outline {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+.btn-outline:hover {
+  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
+  color: var(--accent-ink);
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.icon-btn:hover {
+  border-color: var(--border);
+}
+
+/* Inputs, Selects & Textareas */
+input[type="text"],
+input[type="date"],
+input[type="number"],
+input[type="time"],
+select,
+textarea {
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.9rem;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease), background 0.18s var(--ease);
+}
+
+input[type="text"]:hover,
+input[type="date"]:hover,
+input[type="number"]:hover,
+input[type="time"]:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--border-strong);
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus,
+input[type="number"]:focus,
+input[type="time"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px var(--accent-light);
+}
+
+/* ============================================================
+   4. Unified Segmented Sub-Navigation Bars Across ALL Tabs
+   ============================================================ */
+.tabStart-subnav-bar,
+.tab2-subnav-bar,
+.tasks-inner-subnav,
+.hope-subnav-bar,
+.stats-subnav-bar {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  padding: 5px !important;
+  gap: 5px !important;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+  margin-bottom: 16px !important;
+}
+
+.tabStart-subnav-btn,
+.tab2-subnav-btn,
+.tasks-inner-subbtn,
+.hope-subnav-btn,
+.stats-subnav-btn {
+  min-height: 40px !important;
+  padding: 8px 14px !important;
+  border-radius: 12px !important;
+  border: 1px solid transparent !important;
+  font-size: 0.84rem !important;
+  font-weight: 800 !important;
+  color: var(--muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: all 0.2s var(--ease) !important;
+}
+
+.tabStart-subnav-btn:hover,
+.tab2-subnav-btn:hover,
+.tasks-inner-subbtn:hover,
+.hope-subnav-btn:hover,
+.stats-subnav-btn:hover {
+  color: var(--text) !important;
+  background: color-mix(in srgb, var(--surface) 65%, transparent) !important;
+}
+
+.tab2-subnav-btn.active,
+.tasks-inner-subbtn.active,
+.stats-subnav-btn.active {
+  background: var(--surface) !important;
+  color: var(--accent-ink) !important;
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border)) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.tabStart-subnav-btn.active-sand {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px -4px rgba(79, 70, 229, 0.42) !important;
+}
+
+.tabStart-subnav-btn.active-gold {
+  background: var(--gold-grad) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px -4px rgba(217, 119, 6, 0.42) !important;
+}
+
+.hope-subnav-btn.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px -4px rgba(5, 150, 105, 0.38) !important;
+}
+
+/* ============================================================
+   5. Tab 1 — Time Blocking Architectural Polish
+   ============================================================ */
+.tb-top-header {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 22px !important;
+  padding: 16px 20px !important;
+  box-shadow: var(--shadow-sm) !important;
+  gap: 14px !important;
+}
+
+.tb-date-nav-group {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  padding: 5px 8px !important;
+  gap: 6px !important;
+}
+
+.tb-nav-arrow {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 10px !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow-xs) !important;
+}
+.tb-nav-arrow:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  transform: translateY(-1px);
+}
+
+.tb-today-btn,
+.tb-obligations-corner-btn,
+.tb-reminder-bell-btn {
+  height: 38px !important;
+  padding: 0 14px !important;
+  border-radius: 12px !important;
+  font-size: 0.81rem !important;
+  font-weight: 800 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: transform 0.16s var(--ease), box-shadow 0.2s var(--ease) !important;
+}
+
+.tb-toolbar-bar {
+  background: color-mix(in srgb, var(--surface) 75%, transparent) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  padding: 10px 16px !important;
+  margin-bottom: 14px !important;
+}
+
+.tb-block-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: transform 0.2s var(--ease), box-shadow 0.22s var(--ease), border-color 0.22s var(--ease) !important;
+}
+.tb-block-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border)) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* ============================================================
+   6. Tab 2 — فقط ابدأ & عدّاد الذهب
+   ============================================================ */
+.gold-balance-banner {
+  border-radius: 18px !important;
+  border: 1px solid rgba(217, 119, 6, 0.28) !important;
+  box-shadow: 0 8px 24px -8px rgba(217, 119, 6, 0.22) !important;
+}
+
+.sand-card,
+.gold-timer-card {
+  border-radius: 24px !important;
+  padding: 26px 24px !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.sand-seg {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  padding: 4px !important;
+  border-radius: 14px !important;
+}
+
+.sand-seg button {
+  border-radius: 10px !important;
+  min-height: 38px !important;
+  font-weight: 800 !important;
+}
+
+#sandClock,
+#goldClock {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+}
+
+#sandControls,
+#goldControls {
+  gap: 10px !important;
+}
+#sandControls .btn,
+#goldControls .btn {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 14px;
+}
+
+/* ============================================================
+   7. Tab 3 — المهام، العادات، الخزينة، XP & HP
+   ============================================================ */
+.progress-container {
+  border-radius: 14px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface-2) !important;
+  overflow: visible;
+}
+
+.xp-rank-hero-card {
+  border-radius: 22px !important;
+  box-shadow: var(--shadow-md) !important;
+  border: 1px solid rgba(99, 102, 241, 0.26) !important;
+}
+
+#habitResilienceCardBox > div,
+.habit-resilience-card {
+  border-radius: 20px !important;
+}
+
+.cat-studio-card,
+.advisor-card,
+.quota-item-card,
+.vault-tier-hero-card {
+  border-radius: 18px !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: transform 0.2s var(--ease), box-shadow 0.22s var(--ease), border-color 0.22s var(--ease);
+}
+
+.vault-tier-hero-card:hover,
+.cat-studio-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* ============================================================
+   8. Tab 4 (المتتبع الدائري), Tab 5 (عداد الأمل), Tab 6 (القوانين), Tab 7 (الملاحظات)
+   ============================================================ */
+.arabic-top-quote {
+  border-radius: 20px !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border)) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.special-rule-card {
+  border-radius: 22px !important;
+  border: 1px solid color-mix(in srgb, var(--red) 28%, var(--border)) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.chip {
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  padding: 4px 11px !important;
+}
+
+/* ============================================================
+   9. Tab 8 — الإحصائيات والأوسمة (82 Badges Grid)
+   ============================================================ */
+.badge-card {
+  border-radius: 18px !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-xs) !important;
+  transition: transform 0.2s var(--ease), box-shadow 0.22s var(--ease), border-color 0.22s var(--ease) !important;
+}
+
+.badge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md) !important;
+}
+
+.badge-card.unlocked {
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.badge-filter-btn {
+  min-height: 34px !important;
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+  transition: all 0.18s var(--ease) !important;
+}
+
+/* ============================================================
+   10. Modals, Dialogs & Floating Toasts
+   ============================================================ */
+#appDialogOverlay,
+.hb-modal-overlay,
+#badgeUnlockModalOverlay {
+  background: rgba(8, 12, 22, 0.68) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.app-dialog-box,
+.hb-modal-box,
+.badge-unlock-modal-box {
+  border-radius: 24px !important;
+  border: 1px solid var(--border-strong) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.app-toast-item {
+  border-radius: 999px !important;
+  padding: 12px 20px !important;
+  box-shadow: var(--shadow-lg) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ============================================================
+   11. Mobile & Tablet Responsive Refinement
+   ============================================================ */
+@media (max-width: 720px) {
+  header {
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px;
+    gap: 10px;
+  }
+  .container {
+    margin: 14px auto;
+    padding: 0 12px;
+  }
+  .card {
+    padding: 16px 15px;
+    border-radius: 18px;
+  }
+  .tabs-nav {
+    padding: 8px 12px;
+  }
+  .tab-btn {
+    height: 36px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+  }
+  .header-rank-pill,
+  .header-niyyah-btn,
+  .overall-streak-box {
+    height: 34px;
+    padding: 0 11px !important;
+    font-size: 0.76rem !important;
+  }
+}
+/* ==================== END HABITICO STUDIO DESIGN SYSTEM V2 ==================== */
+
   </style>
 </head>
 <body>
@@ -4903,6 +5707,10 @@
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <button type="button" id="headerRankPill" class="header-rank-pill" onclick="openBadgesAndRanksPage()" title="عرض الأوسمة ومستوى الخبرة والألقاب">
+        <span>🌱</span>
+        <span>Lv 1 • البادئ الشجاع</span>
+      </button>
       <button type="button" class="header-niyyah-btn" onclick="openDailyNiyyahPopup(true)" title="فتح رسالة تجديد النية اليومية">
         <span>📿</span>
         <span>وقفة تجديد النية</span>
@@ -5274,6 +6082,9 @@
 
       <!-- B. قسم العادات الدورية والخطوات الفرعية وخزان طاقة الصمود (100 HP) -->
       <div id="tab2View_habits" style="display:none;">
+        <!-- مؤشر الخبرة والمستوى والألقاب (فوق مؤشر طاقة الـ HP مباشرة) -->
+        <div id="habitsXpRankCardBox"></div>
+
         <!-- بطاقة خزان طاقة الصمود الأسبوعي (Weekly Habit Resilience HP) -->
         <div id="habitResilienceCardBox"></div>
 
@@ -5363,39 +6174,46 @@
 
     <!-- ==================== التاب الرابع الجديد: القوانين (tabRules) ==================== -->
     <section id="tabRules" class="tab-content">
-      <!-- القسم الأول: القوانين المميزة (ثابت في الأعلى ويدعم إضافة أكثر من قانون مميز) -->
+      <!-- البطاقة الموحدة الوحيدة للقوانين (بنفس تصميم وألوان بطاقة القوانين المميزة) -->
       <div class="card special-rule-card">
-        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;">
           <div>
-            <h3 style="font-size:1.15rem; color:var(--amber-ink);">🌟 القوانين المميزة</h3>
-            <p class="hint">
-              مخالفة أي قانون مميز لا تصفر الاستريك، ولكنها <strong>تفرض عليك عقوبة الصيام فوراً</strong>.
+            <h3 style="font-size:1.18rem; color:var(--amber-ink); margin:0;">⚖️ القوانين</h3>
+            <p class="hint" style="margin:4px 0 0; line-height:1.6;">
+              لكل قانون يمكنك اختيار عقوبة واحدة أو أكثر معاً (<strong>صيام</strong>، <strong>تصفير عداد الانضباط</strong>، <strong>خصم 25 HP</strong> — وعند وصول الطاقة إلى 0% تترتب عقوبة الصيام وتُعاد تعبئة الطاقة إلى 100%).
             </p>
           </div>
-          <span id="specialRuleStatusBadge" class="hint"></span>
+          <span id="unifiedRulesHpBadge" class="chip done" style="font-size:0.82rem; font-weight:900;">🛡️ طاقة الصمود: 100 / 100 HP</span>
         </div>
 
-        <div style="display:flex; gap:8px; margin-bottom:16px;">
-          <input type="text" id="newSpecialRuleInput" placeholder="أضف قانوناً مميزاً جديداً..." />
-          <button class="btn btn-primary" onclick="addSpecialRule()">+ إضافة قانون مميز</button>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:16px;">
+          <div id="unifiedRuleFormTitle" style="font-weight:900; font-size:0.84rem; color:var(--amber-ink); margin-bottom:8px;">➕ إضافة قانون جديد وتحديد عقوباته</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+            <input type="text" id="newUnifiedRuleInput" placeholder="اكتب نص القانون هنا..." style="flex:1; min-width:200px;" onkeydown="if(event.key==='Enter') saveUnifiedRuleForm()" />
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;">
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+              <label class="substep-row-btn" style="cursor:pointer; padding:5px 10px;">
+                <input type="checkbox" id="unifiedRulePenFasting" style="width:16px; height:16px;" />
+                <span style="font-size:0.8rem; font-weight:800;">🌙 صيام</span>
+              </label>
+              <label class="substep-row-btn" style="cursor:pointer; padding:5px 10px;">
+                <input type="checkbox" id="unifiedRulePenResetStreak" style="width:16px; height:16px;" />
+                <span style="font-size:0.8rem; font-weight:800;">🔥 تصفير عداد الانضباط</span>
+              </label>
+              <label class="substep-row-btn" style="cursor:pointer; padding:5px 10px;">
+                <input type="checkbox" id="unifiedRulePenHp25" checked style="width:16px; height:16px;" />
+                <span style="font-size:0.8rem; font-weight:800;">🛡️ خصم 25 نقطة HP</span>
+              </label>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button type="button" id="unifiedRuleCancelEditBtn" class="btn btn-outline btn-sm" style="display:none;" onclick="resetUnifiedRuleForm()">إلغاء</button>
+              <button type="button" id="unifiedRuleSubmitBtn" class="btn btn-primary btn-sm" onclick="saveUnifiedRuleForm()">+ إضافة قانون</button>
+            </div>
+          </div>
         </div>
 
-        <div id="specialRulesListContainer"></div>
-      </div>
-
-      <!-- القسم الثاني: القوانين العامة -->
-      <div class="card">
-        <h3 style="margin-bottom:6px;">⚖️ القوانين العامة</h3>
-        <p class="hint" style="margin-bottom:14px;">
-          مخالفة أي قانون عام <strong>تصفر فوراً الاستريك العام للتطبيق والاستريك المصغر لكل عادة (0)</strong> مع بقاء المربعات الخضراء في الشكل الدائري خضراء كما هي، وتُسجل المخالفة في الإحصائيات.
-        </p>
-
-        <div style="display:flex; gap:8px; margin-bottom:18px;">
-          <input type="text" id="newGeneralRuleInput" placeholder="أضف قانوناً عاماً جديداً للانضباط..." />
-          <button class="btn btn-primary" onclick="addGeneralRule()">+ إضافة قانون</button>
-        </div>
-
-        <div id="generalRulesListContainer"></div>
+        <div id="unifiedRulesListContainer"></div>
       </div>
 
       <!-- ==================== 🔄 بطاقة المزامنة بين الأجهزة ==================== -->
@@ -5445,20 +6263,7 @@
         </p>
       </div>
 
-      <!-- نافذة البداية الجديدة النظيفة أسفل صفحة القوانين -->
-      <div class="card">
-        <div style="background:var(--green-light); border:1.5px solid var(--green); border-radius:14px; padding:16px;">
-          <div style="font-weight:900; color:var(--green-ink); font-size:1rem; margin-bottom:6px;">
-            🌱 البداية الجديدة النظيفة (Fresh Start)
-          </div>
-          <p class="hint" style="color:var(--text); font-size:0.84rem; margin-bottom:14px; line-height:1.7;">
-            يحتفظ بتاب <strong>توزيع الوقت (Time Blocking)</strong> كاملاً كما هو (مواعيد البلوكات، المهام داخل البلوكات، الالتزامات والتذكيرات)، و<strong>المهام الأسبوعية وتصنيفاتها وحصصها</strong>، وأسماء عاداتك ومكافآتك وقوانينك، مع <strong>تصفير المتتبع الدائري والعادات الدورية (إعادة الـ HP إلى 100% وإلغاء قفل تاريخ البداية)، وتصفير عدّاد الذهب، والإحصائيات، وعدّاد الأمل والأوسمة، وعقوبات الصيام والمخالفات</strong> لتبدأ صفحة جديدة على بياض.
-          </p>
-          <div>
-            <button type="button" class="btn btn-success" style="font-weight:900; padding:11px 22px; font-size:0.92rem;" onclick="triggerInAppFreshStart()">✨ بدء جديد فوري داخل التطبيق الآن</button>
-          </div>
-        </div>
-      </div>
+
     </section>
 
     <!-- ==================== التاب السابع الجديد: عدّاد الأمل 🌱 (رحلة الـ 90 يوماً للتعافي والتحرر) ==================== -->
@@ -5590,18 +6395,24 @@
     <!-- ==================== التاب الخامس (الأخير): الإحصائيات العامة + بوصلة التخطيط الذكي ==================== -->
     <section id="tab4" class="tab-content">
 
-      <!-- شريط التبديل العلوي داخل تاب الإحصائيات: الإحصائيات العامة | بوصلة التخطيط الذكي (Planning Analytics) -->
+      <!-- شريط التبديل العلوي داخل تاب الإحصائيات: الإحصائيات العامة | بوصلة التخطيط الذكي | الأوسمة والألقاب -->
       <div class="stats-subnav-bar">
         <button type="button" id="btnStatsSub_general" class="stats-subnav-btn active" onclick="switchStatsSubView('general')">
           📊 الإحصائيات العامة وسجل الساعات
         </button>
         <button type="button" id="btnStatsSub_compass" class="stats-subnav-btn" onclick="switchStatsSubView('compass')">
-          🧭 بوصلة التخطيط الذكي (تحليل متوسط التصنيفات والخطوات)
+          🧭 بوصلة التخطيط الذكي وخريطة المنهج
+        </button>
+        <button type="button" id="btnStatsSub_badges" class="stats-subnav-btn" onclick="switchStatsSubView('badges')">
+          🏅 الأوسمة والألقاب
         </button>
       </div>
 
-      <!-- الشاشة الفرعية الجديدة: بوصلة التخطيط الذكي وقياس متوسط الزمن لكل تصنيف وتوبيك وخطوة -->
+      <!-- الشاشة الفرعية: بوصلة التخطيط الذكي وخريطة المنهج -->
       <div id="statsPlanningCompassView" style="display:none;"></div>
+
+      <!-- الشاشة الفرعية الجديدة: الأوسمة والتحديات والخبرة والألقاب -->
+      <div id="statsBadgesAndRanksView" style="display:none;"></div>
 
       <!-- 1. الشاشة الافتراضية: الإحصائيات العامة (General Overview) -->
       <div id="statsGeneralView">
@@ -5665,30 +6476,10 @@
         <div class="card">
           <h3 style="margin-bottom:6px;">💾 النسخ الاحتياطي واستعادة البيانات (Export / Import)</h3>
           <p class="hint" style="margin-bottom:14px;">
-            اختر بين <strong>البداية الجديدة النظيفة (Fresh Start)</strong> لحفظ عاداتك ومهامك وتصنيفاتك ومكافآتك والبدء من الصفر بطاقة 100% HP بدون أي مربعات حمراء أو عقوبات قديمة، أو <strong>النسخ الاحتياطي الكامل</strong> مع السجلات السابقة.
+            احفظ نسخة احتياطية كاملة من بياناتك وسجلاتك أو استعدها في أي وقت.
           </p>
 
-          <!-- خيار 1: البداية الجديدة النظيفة (Fresh Start) -->
-          <div style="background:var(--green-light); border:1.5px solid var(--green); border-radius:14px; padding:14px; margin-bottom:14px;">
-            <div style="font-weight:800; color:var(--green-ink); font-size:0.95rem; margin-bottom:4px;">
-              🌱 البداية الجديدة النظيفة (Fresh Start — حفظ العادات والمهام والمكافآت فقط)
-            </div>
-            <p class="hint" style="color:var(--text); font-size:0.82rem; margin-bottom:10px; line-height:1.65;">
-              يحتفظ بجميع عاداتك (العادية والدورية وخطواتها)، ومهامك وتصنيفاتك، ومكافآتك في الخزينة والمتجر، وقوانينك وملاحظاتك، مع <strong>تصفير جميع المربعات الحمراء والخضراء، وإعادة طاقة الـ HP إلى 100%، وإلغاء قفل تاريخ البداية ونسبة الالتزام وعقوبات الصيام</strong> (يعمل حتى لو استوردت ملفاً قديماً من النسخة السابقة للتطبيق!).
-            </p>
-            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-              <button type="button" class="btn btn-success btn-sm" onclick="downloadFreshStartBackupFile()">🌱 حفظ ملف بداية جديدة (Fresh JSON)</button>
-              <button type="button" class="btn btn-outline btn-sm" style="background:var(--surface);" onclick="exportFreshStartBackupData('stats')">📋 نسخ كود بداية جديدة (Export)</button>
-              <label class="btn btn-primary btn-sm" style="cursor:pointer; display:inline-flex; align-items:center; margin:0;">
-                📂 استيراد ملف كبداية جديدة (Fresh Import)
-                <input type="file" accept=".json,.txt" style="display:none;" onchange="importFromFile(event, 'fresh')" />
-              </label>
-              <button type="button" class="btn btn-outline btn-sm" style="background:var(--surface);" onclick="toggleImportArea('stats', 'fresh')">📥 لصق كود كبداية جديدة</button>
-              <button type="button" class="btn btn-outline btn-sm" style="background:var(--surface); border-color:var(--amber); color:var(--amber-ink);" onclick="triggerInAppFreshStart()">✨ بدء جديد فوري داخل التطبيق الآن</button>
-            </div>
-          </div>
-
-          <!-- خيار 2: النسخ الاحتياطي الكامل بالسجلات القديمة -->
+          <!-- النسخ الاحتياطي الكامل بالسجلات -->
           <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:12px;">
             <div style="font-weight:700; color:var(--muted); font-size:0.86rem; margin-bottom:8px;">
               📦 النسخ الاحتياطي الكامل (مع جميع الأيام السابقة والمربعات والإحصائيات القديمة):
@@ -8148,7 +8939,7 @@
       }
     }
 
-    // سحب نرد الجاكبوت العشوائي عند كل إنجاز (تاسك 70% | عادة دورية 20% | دائري 10%)
+    // سحب نرد الجاكبوت العشوائي عند كل إنجاز (تاسك/كوتة 80% | عادة دورية 15% | دائري 5%)
     function rollDopamineJackpot(sourceType, stars, uniqueKey, splitN) {
       checkMonthlyJackpotCycle();
       const mj = state.monthlyJackpot;
@@ -8214,14 +9005,16 @@
       const starMultiplier = { 1: 0.5, 2: 1.0, 3: 2.2, 4: 4.2 }[stars || 1] || 1.0;
       const monthMultiplier = getMonthsSinceStart() === 1 ? 1.35 : (getMonthsSinceStart() === 2 ? 1.15 : 1.0);
 
-      // عداد حماية الجفاف المتتالي (Anti-Drought Pity Escalator)
+      // عداد حماية الجفاف المتتالي (Anti-Drought Pity Escalator) — موزّع نسبياً حسب وزن المصدر حتى لا تسرق العادات الصغيرة رصيد مهام المذاكرة
+      const weightRatio = weightFactor / 0.80;
       const droughtBonus = Math.min(0.20, (mj.droughtStreak || 0) * 0.015);
+      const effectiveDroughtBonus = droughtBonus * weightRatio;
       const baseRollChance = 0.08;
       const finalChance = isMicro
         ? Math.min(0.02, 0.0015 * (starMultiplier / 4.2) * monthMultiplier)   // رمية صغيرة جداً لكل خطوة (بلا مكافأة جفاف)
         : (isSplit
-          ? 1 - Math.pow(1 - Math.min(0.75, (baseRollChance * weightFactor * starMultiplier * monthMultiplier) + droughtBonus), 1 / splitN)   // حصة الخطوة بحيث يساوي مجموع خطواتها احتمال المهمة كاملة
-          : Math.min(0.75, (baseRollChance * weightFactor * starMultiplier * monthMultiplier) + droughtBonus));
+          ? 1 - Math.pow(1 - Math.min(0.75, (baseRollChance * weightFactor * starMultiplier * monthMultiplier) + effectiveDroughtBonus), 1 / splitN)   // حصة الخطوة بحيث يساوي مجموع خطواتها احتمال المهمة كاملة
+          : Math.min(0.75, (baseRollChance * weightFactor * starMultiplier * monthMultiplier) + effectiveDroughtBonus));
 
       const roll = Math.random();
       if (roll < finalChance) {
@@ -8301,7 +9094,10 @@
         saveState();
         fireJackpotCelebration(targetTier, displayTitle, pickedReward.durationMin || (realDurationHours * 60));
       } else {
-        if (!isMicro) mj.droughtStreak = (mj.droughtStreak || 0) + (isSplit ? 1 / splitN : 1);
+        if (!isMicro) {
+          const streakStep = (isSplit ? 1 / splitN : 1) * weightRatio;
+          mj.droughtStreak = Math.round(((mj.droughtStreak || 0) + streakStep) * 1000) / 1000;
+        }
         saveState();
       }
     }
@@ -10958,245 +11754,289 @@
       `).join('');
     }
 
-    // ==================== التاب الرابع الجديد: القوانين (tabRules) ====================
-    function addSpecialRule() {
-      const inp = document.getElementById('newSpecialRuleInput');
-      const text = inp.value.trim();
-      if (!text) return;
-      state.rulesData.specialRules.push({
-        id: 'sr_' + Date.now(),
-        text
+    // ==================== تاب القوانين الموحدة (تخصيص العقوبات: صيام / تصفير عداد الانضباط / خصم 25 HP) ====================
+    let _editingUnifiedRuleId = null;
+
+    function normalizeRulePenalties(arr) {
+      const valid = new Set(['fasting', 'reset_streak', 'deduct_hp_25']);
+      const list = Array.isArray(arr) ? arr.filter(x => valid.has(x)) : [];
+      const uniq = [...new Set(list)];
+      return uniq.length > 0 ? uniq : ['deduct_hp_25'];
+    }
+
+    function ensureUnifiedRulesMigrated() {
+      if (!state.rulesData || typeof state.rulesData !== 'object') {
+        state.rulesData = { unifiedRules: [], violationLogs: [], _unifiedRulesMigrated: true };
+      }
+      if (!Array.isArray(state.rulesData.violationLogs)) state.rulesData.violationLogs = [];
+      if (!Array.isArray(state.rulesData.unifiedRules)) state.rulesData.unifiedRules = [];
+
+      if (!state.rulesData._unifiedRulesMigrated) {
+        const seen = new Set(state.rulesData.unifiedRules.map(x => String(x && x.text || '').trim()).filter(Boolean));
+        (Array.isArray(state.rulesData.specialRules) ? state.rulesData.specialRules : []).forEach((item, idx) => {
+          const txt = String(item && item.text || '').trim();
+          if (txt && !seen.has(txt)) {
+            seen.add(txt);
+            state.rulesData.unifiedRules.push({
+              id: (item && item.id) ? ('ur_' + item.id) : ('ur_sp_' + Date.now() + '_' + idx),
+              text: txt,
+              penalties: ['fasting']
+            });
+          }
+        });
+        (Array.isArray(state.rulesData.generalRules) ? state.rulesData.generalRules : []).forEach((item, idx) => {
+          const txt = String(item && item.text || '').trim();
+          if (txt && !seen.has(txt)) {
+            seen.add(txt);
+            state.rulesData.unifiedRules.push({
+              id: (item && item.id) ? ('ur_' + item.id) : ('ur_gn_' + Date.now() + '_' + idx),
+              text: txt,
+              penalties: ['reset_streak']
+            });
+          }
+        });
+        state.rulesData._unifiedRulesMigrated = true;
+      }
+
+      state.rulesData.unifiedRules.forEach(r => {
+        if (r) r.penalties = normalizeRulePenalties(r.penalties);
       });
-      state.rulesData.specialRuleText = state.rulesData.specialRules[0].text;
-      inp.value = '';
+      return state.rulesData.unifiedRules;
+    }
+
+    function resetUnifiedRuleForm() {
+      _editingUnifiedRuleId = null;
+      const inp = document.getElementById('newUnifiedRuleInput');
+      const chkF = document.getElementById('unifiedRulePenFasting');
+      const chkS = document.getElementById('unifiedRulePenResetStreak');
+      const chkH = document.getElementById('unifiedRulePenHp25');
+      const titleEl = document.getElementById('unifiedRuleFormTitle');
+      const submitBtn = document.getElementById('unifiedRuleSubmitBtn');
+      const cancelBtn = document.getElementById('unifiedRuleCancelEditBtn');
+      if (inp) inp.value = '';
+      if (chkF) chkF.checked = false;
+      if (chkS) chkS.checked = false;
+      if (chkH) chkH.checked = true;
+      if (titleEl) titleEl.textContent = '➕ إضافة قانون جديد وتحديد عقوباته';
+      if (submitBtn) submitBtn.textContent = '+ إضافة قانون';
+      if (cancelBtn) cancelBtn.style.display = 'none';
+    }
+
+    function saveUnifiedRuleForm() {
+      ensureUnifiedRulesMigrated();
+      const inp = document.getElementById('newUnifiedRuleInput');
+      const text = inp ? inp.value.trim() : '';
+      if (!text) return showAppToast('الرجاء كتابة نص القانون أولاً.');
+
+      const chkF = document.getElementById('unifiedRulePenFasting');
+      const chkS = document.getElementById('unifiedRulePenResetStreak');
+      const chkH = document.getElementById('unifiedRulePenHp25');
+      const penalties = [];
+      if (chkF && chkF.checked) penalties.push('fasting');
+      if (chkS && chkS.checked) penalties.push('reset_streak');
+      if (chkH && chkH.checked) penalties.push('deduct_hp_25');
+
+      if (penalties.length === 0) {
+        return showAppToast('⚠️ اختر عقوبة واحدة على الأقل لهذا القانون.');
+      }
+
+      if (_editingUnifiedRuleId) {
+        const r = state.rulesData.unifiedRules.find(x => x.id === _editingUnifiedRuleId);
+        if (r) {
+          r.text = text;
+          r.penalties = penalties;
+        }
+        saveState();
+        resetUnifiedRuleForm();
+        renderAll();
+        showAppToast('✅ تم تحديث القانون وعقوباته.');
+      } else {
+        state.rulesData.unifiedRules.push({
+          id: 'ur_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+          text,
+          penalties
+        });
+        saveState();
+        resetUnifiedRuleForm();
+        renderAll();
+        showAppToast('⚖️ تمت إضافة القانون بنجاح.');
+      }
+    }
+
+    function addUnifiedRule() {
+      saveUnifiedRuleForm();
+    }
+
+    function editUnifiedRule(ruleId) {
+      const list = ensureUnifiedRulesMigrated();
+      const r = list.find(x => x.id === ruleId);
+      if (!r) return;
+      _editingUnifiedRuleId = r.id;
+      const inp = document.getElementById('newUnifiedRuleInput');
+      const chkF = document.getElementById('unifiedRulePenFasting');
+      const chkS = document.getElementById('unifiedRulePenResetStreak');
+      const chkH = document.getElementById('unifiedRulePenHp25');
+      const titleEl = document.getElementById('unifiedRuleFormTitle');
+      const submitBtn = document.getElementById('unifiedRuleSubmitBtn');
+      const cancelBtn = document.getElementById('unifiedRuleCancelEditBtn');
+      const pens = normalizeRulePenalties(r.penalties);
+      if (inp) { inp.value = r.text; try { inp.focus(); } catch (e) {} }
+      if (chkF) chkF.checked = pens.includes('fasting');
+      if (chkS) chkS.checked = pens.includes('reset_streak');
+      if (chkH) chkH.checked = pens.includes('deduct_hp_25');
+      if (titleEl) titleEl.textContent = '✎ تعديل القانون وتخصيص عقوباته';
+      if (submitBtn) submitBtn.textContent = '💾 حفظ التعديل';
+      if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+    }
+
+    function deleteUnifiedRule(ruleId) {
+      const list = ensureUnifiedRulesMigrated();
+      const r = list.find(x => x.id === ruleId);
+      if (!r) return;
+      openAppConfirmDialog(
+        '🗑️ حذف القانون',
+        `هل تريد حذف القانون "${r.text}" من القائمة؟ (سيبقى سجل مخالفاته التاريخي محفوظاً في الإحصائيات).`,
+        function() {
+          if (_editingUnifiedRuleId === ruleId) resetUnifiedRuleForm();
+          state.rulesData.unifiedRules = state.rulesData.unifiedRules.filter(x => x.id !== ruleId);
+          saveState();
+          renderAll();
+          showAppToast('🗑️ تم حذف القانون.');
+        },
+        true
+      );
+    }
+
+    function formatRulePenaltyBadgesHtml(penalties) {
+      const pens = normalizeRulePenalties(penalties);
+      const map = {
+        fasting: '<span class="chip" style="font-size:0.71rem; background:var(--amber-light); color:var(--amber-ink); font-weight:800;">🌙 صيام</span>',
+        reset_streak: '<span class="chip" style="font-size:0.71rem; background:var(--red-light); color:var(--red-ink); font-weight:800;">🔥 تصفير عداد الانضباط</span>',
+        deduct_hp_25: '<span class="chip" style="font-size:0.71rem; background:rgba(59,130,246,0.12); color:#2563eb; font-weight:800;">🛡️ خصم 25 HP</span>'
+      };
+      return pens.map(p => map[p] || '').join(' ');
+    }
+
+    function executeUnifiedRuleViolation(ruleId) {
+      const list = ensureUnifiedRulesMigrated();
+      const r = list.find(x => x.id === ruleId);
+      if (!r) return;
+      const pens = normalizeRulePenalties(r.penalties);
+      const sysToday = getSystemTodayYMD();
+      const currentSun = getWeekSundayYMD(sysToday);
+      const curHp = (typeof state.weeklyHabitHp === 'number') ? Math.round(state.weeklyHabitHp * 10) / 10 : 100;
+      const effects = [];
+      let shouldIssueFasting = pens.includes('fasting');
+      let fastingReasons = [];
+
+      if (pens.includes('fasting')) {
+        fastingReasons.push('خرق القانون (' + r.text + ')');
+        effects.push('فرض عقوبة الصيام');
+      }
+
+      if (pens.includes('reset_streak')) {
+        state.lastStreakResetDate = sysToday;
+        state.checkinAfterReset = false;
+        state.habitCheckinAfterReset = {};
+        effects.push('تصفير عداد الانضباط (0)');
+      }
+
+      if (pens.includes('deduct_hp_25')) {
+        const rawAfter = Math.round((curHp - 25) * 10) / 10;
+        if (rawAfter <= 0) {
+          shouldIssueFasting = true;
+          fastingReasons.push('وصول طاقة الصمود إلى 0% بسبب خرق القانون (' + r.text + ')');
+          state.weeklyHabitHp = 100;
+          state.weeklyHabitHpResetSunday = currentSun;
+          effects.push('خصم 25 HP ← وصول الطاقة إلى 0% ← عقوبة صيام + إعادة تعبئة 100%');
+        } else {
+          state.weeklyHabitHp = rawAfter;
+          state.weeklyHabitHpResetSunday = currentSun;
+          effects.push(`خصم 25 HP (المتبقي: ${rawAfter} HP)`);
+        }
+      }
+
+      if (shouldIssueFasting) {
+        ensureFastingPenaltyRecord(currentSun, fastingReasons.join(' + '), r.text);
+      }
+
+      state.rulesData.violationLogs.unshift({
+        id: 'vlog_' + Date.now(),
+        ruleId: r.id,
+        ruleName: r.text,
+        rawRuleText: r.text,
+        ruleType: 'unified',
+        penalties: pens.slice(),
+        weekSunday: currentSun,
+        date: sysToday,
+        effect: effects.join(' + ')
+      });
+
       saveState();
       renderAll();
-      showAppToast('🌟 تمت إضافة القانون المميز.');
+      showAppToast(`🚨 تم تسجيل خرق القانون وتطبيق: ${effects.join(' + ')}`);
     }
 
-    function editSpecialRule(ruleId) {
-      const r = state.rulesData.specialRules.find(x => x.id === ruleId);
+    function violateUnifiedRule(ruleId) {
+      const list = ensureUnifiedRulesMigrated();
+      const r = list.find(x => x.id === ruleId);
       if (!r) return;
-      openAppPromptDialog(
-        '✎ تعديل نص القانون المميز',
-        'اكتب النص الجديد للقانون المميز:',
-        r.text,
-        function(newText) {
-          const trimmed = (newText || '').trim();
-          if (!trimmed) return showAppToast('لا يمكن ترك نص القانون المميز فارغاً.');
-          r.text = trimmed;
-          if (state.rulesData.specialRules.length > 0) {
-            state.rulesData.specialRuleText = state.rulesData.specialRules[0].text;
-          }
-          saveState();
-          renderAll();
+      const pens = normalizeRulePenalties(r.penalties);
+      const curHp = (typeof state.weeklyHabitHp === 'number') ? Math.round(state.weeklyHabitHp * 10) / 10 : 100;
+      const lines = [`القانون: «${r.text}»`, '', 'العقوبات التي ستُطبّق فوراً عند التأكيد:'];
+
+      if (pens.includes('fasting')) {
+        lines.push('• 🌙 فرض عقوبة الصيام فوراً.');
+      }
+      if (pens.includes('reset_streak')) {
+        lines.push('• 🔥 تصفير عداد الانضباط (الاستريك العام واستريك كل عادة إلى 0).');
+      }
+      if (pens.includes('deduct_hp_25')) {
+        const rawAfter = Math.round((curHp - 25) * 10) / 10;
+        if (rawAfter <= 0) {
+          lines.push(`• 🛡️ خصم 25 HP (من ${curHp} HP إلى 0 HP) ← ⚠️ سيترتب على ذلك فرض «عقوبة الصيام» فوراً ثم إعادة تعبئة طاقة الصمود إلى 100%!`);
+        } else {
+          lines.push(`• 🛡️ خصم 25 HP من طاقة الصمود (من ${curHp} HP إلى ${rawAfter} HP).`);
         }
-      );
-    }
+      }
+      lines.push('', 'هل تؤكد تسجيل هذا الخرق؟');
 
-    function deleteSpecialRule(ruleId) {
-      const r = state.rulesData.specialRules.find(x => x.id === ruleId);
       openAppConfirmDialog(
-        '🗑️ حذف القانون المميز',
-        `هل تريد حذف القانون المميز "${r ? r.text : ''}" من القائمة؟ (سيبقى سجل مخالفاته التاريخي محفوظاً في الإحصائيات).`,
-        function() {
-          state.rulesData.specialRules = state.rulesData.specialRules.filter(x => x.id !== ruleId);
-          if (state.rulesData.specialRules.length > 0) {
-            state.rulesData.specialRuleText = state.rulesData.specialRules[0].text;
-          }
-          saveState();
-          renderAll();
-          showAppToast('🗑️ تم حذف القانون المميز.');
-        },
-        true
-      );
-    }
-
-    function violateSpecialRule(ruleId) {
-      const r = ruleId
-        ? state.rulesData.specialRules.find(x => x.id === ruleId)
-        : state.rulesData.specialRules[0];
-      const ruleText = r ? r.text : state.rulesData.specialRuleText;
-      openAppConfirmDialog(
-        '🚨 تأكيد مخالفة القانون المميز',
-        `"${ruleText}"
-هل أنت متأكد أنك خالفت هذا القانون المميز اليوم؟
-(لن يتصفر الاستريك، ولكن ستُقفل الجوائز المشروطة بعدم مخالفة قانون مميز فوراً، وتُفرض عليك عقوبة الصيام مع حفظ اسم هذا القانون في الإحصائيات).`,
-        function() {
-          const sysToday = getSystemTodayYMD();
-          const currentSun = getWeekSundayYMD(sysToday);
-          const wk = ensureWeekData(currentSun);
-          wk.specialRuleViolated = true;
-          if (!Array.isArray(wk.violatedSpecialRuleNames)) wk.violatedSpecialRuleNames = [];
-          if (!wk.violatedSpecialRuleNames.includes(ruleText)) {
-            wk.violatedSpecialRuleNames.push(ruleText);
-          }
-
-          const lockedRewardsNames = (wk.rewards || [])
-            .filter(rw => rw.reqNoSpecialRule)
-            .map(rw => rw.title);
-          const rewardLockEffectText = lockedRewardsNames.length > 0
-            ? `قفل الجوائز (${lockedRewardsNames.join('، ')}) فوراً + فرض عقوبة الصيام`
-            : 'فرض عقوبة الصيام فوراً';
-
-          state.rulesData.violationLogs.unshift({
-            id: 'vlog_' + Date.now(),
-            ruleId: r ? r.id : 'special_rule',
-            ruleName: '🌟 قانون مميز: ' + ruleText,
-            rawRuleText: ruleText,
-            ruleType: 'special',
-            weekSunday: currentSun,
-            lockedRewards: lockedRewardsNames,
-            date: sysToday,
-            effect: rewardLockEffectText
-          });
-
-          ensureFastingPenaltyRecord(currentSun, 'مخالفة القانون المميز (' + ruleText + ')', ruleText);
-
-          saveState();
-          renderAll();
-          showAppToast(`🚨 تم تسجيل مخالفة القانون المميز وفرض عقوبة الصيام فوراً.`);
-        },
-        true
-      );
-    }
-
-    function addGeneralRule() {
-      const inp = document.getElementById('newGeneralRuleInput');
-      const text = inp.value.trim();
-      if (!text) return;
-      state.rulesData.generalRules.push({
-        id: 'gr_' + Date.now(),
-        text
-      });
-      inp.value = '';
-      saveState();
-      renderAll();
-      showAppToast('⚖️ تمت إضافة القانون العام.');
-    }
-
-    function editGeneralRule(ruleId) {
-      const r = state.rulesData.generalRules.find(x => x.id === ruleId);
-      if (!r) return;
-      openAppPromptDialog(
-        '✎ تعديل نص القانون العام',
-        'اكتب النص الجديد للقانون العام:',
-        r.text,
-        function(newText) {
-          const trimmed = (newText || '').trim();
-          if (!trimmed) return showAppToast('لا يمكن ترك نص القانون فارغاً.');
-          r.text = trimmed;
-          saveState();
-          renderAll();
-        }
-      );
-    }
-
-    function deleteGeneralRule(ruleId) {
-      const r = state.rulesData.generalRules.find(x => x.id === ruleId);
-      openAppConfirmDialog(
-        '🗑️ حذف القانون العام',
-        `هل تريد حذف القانون العام "${r ? r.text : ''}" من القائمة؟ (سيبقى سجل مخالفاته التاريخي محفوظاً في الإحصائيات).`,
-        function() {
-          state.rulesData.generalRules = state.rulesData.generalRules.filter(x => x.id !== ruleId);
-          saveState();
-          renderAll();
-          showAppToast('🗑️ تم حذف القانون العام.');
-        },
-        true
-      );
-    }
-
-    function violateGeneralRule(ruleId) {
-      const r = state.rulesData.generalRules.find(x => x.id === ruleId);
-      if (!r) return;
-      openAppConfirmDialog(
-        '🚨 تأكيد مخالفة القانون العام',
-        `"${r.text}"
-هل أنت متأكد؟ سيتصفر فوراً الاستريك العام للتطبيق (0) والاستريك المصغر لكل عادة (0) مع بقاء المربعات الخضراء كما هي، وتُسجل المخالفة في الإحصائيات.`,
-        function() {
-          const sysToday = getSystemTodayYMD();
-          state.lastStreakResetDate = sysToday;
-          state.checkinAfterReset = false;
-          state.habitCheckinAfterReset = {};
-
-          // تصفير شحن الجاكبوت الخفي وخصم ساعات من الميزانية كعقوبة خفية
-          if (state.monthlyJackpot) {
-            checkMonthlyJackpotCycle();
-            state.monthlyJackpot.hoursUsed = Math.min(
-              getMonthlyAllowanceHours(),
-              (state.monthlyJackpot.hoursUsed || 0) + 1.5
-            );
-          }
-
-          state.rulesData.violationLogs.unshift({
-            id: 'vlog_' + Date.now(),
-            ruleId: r.id,
-            ruleName: r.text,
-            rawRuleText: r.text,
-            ruleType: 'general',
-            weekSunday: getWeekSundayYMD(sysToday),
-            date: sysToday,
-            effect: 'تصفير شعلة الانضباط (0) وتصفير العداد التراكمي الخفي للمكافآت'
-          });
-
-          saveState();
-          renderAll();
-          showAppToast('🚨 تم تصفير الاستريك العام واستريك جميع العادات إلى (0).');
-        },
+        '🚨 تأكيد خرق القانون وتطبيق العقوبات',
+        lines.join('\n'),
+        function() { executeUnifiedRuleViolation(ruleId); },
         true
       );
     }
 
     function renderTabRules() {
-      const sysToday = getSystemTodayYMD();
-      const currentSun = getWeekSundayYMD(sysToday);
-      const wk = ensureWeekData(currentSun);
-      const badge = document.getElementById('specialRuleStatusBadge');
-      if (badge) {
-        if (wk.specialRuleViolated) {
-          const vNames = (wk.violatedSpecialRuleNames && wk.violatedSpecialRuleNames.length)
-            ? wk.violatedSpecialRuleNames.join(' ، ')
-            : 'قانون مميز';
-          badge.innerHTML = `<strong style="color:var(--red-ink);">⚠️ تمت مخالفة قانون مميز هذا الأسبوع (${vNames}) — الجوائز المشروطة مقفولة وعقوبة الصيام واجبة.</strong>`;
-        } else {
-          badge.innerHTML = `<span style="color:var(--green-ink);">✅ ملتزم بالقوانين المميزة خلال هذا الأسبوع.</span>`;
-        }
+      const list = ensureUnifiedRulesMigrated();
+      const curHp = (typeof state.weeklyHabitHp === 'number') ? Math.round(state.weeklyHabitHp * 10) / 10 : 100;
+      const hpBadge = document.getElementById('unifiedRulesHpBadge');
+      if (hpBadge) {
+        hpBadge.textContent = `🛡️ طاقة الصمود: ${curHp} / 100 HP`;
+        hpBadge.className = 'chip ' + (curHp > 50 ? 'done' : '');
+        hpBadge.style.background = curHp <= 25 ? 'var(--red-light)' : (curHp <= 50 ? 'var(--amber-light)' : '');
+        hpBadge.style.color = curHp <= 25 ? 'var(--red-ink)' : (curHp <= 50 ? 'var(--amber-ink)' : '');
       }
 
-      const specialContainer = document.getElementById('specialRulesListContainer');
-      if (specialContainer) {
-        if (!state.rulesData.specialRules || state.rulesData.specialRules.length === 0) {
-          specialContainer.innerHTML = `<p class="empty-note">لا توجد قوانين مميزة مضافة حالياً. أضف قانوناً مميزاً في الحقل أعلاه.</p>`;
-        } else {
-          specialContainer.innerHTML = state.rulesData.specialRules.map((sr, idx) => `
-            <div class="rule-item-card" style="border-right-color:var(--amber); background:var(--surface);">
-              <div class="rule-text-wrap">
-                <span>🌟 ${idx + 1}. ${sr.text}</span>
-              </div>
-              <div class="rule-actions">
-                <button class="btn btn-danger btn-sm" onclick="violateSpecialRule('${sr.id}')">🚨 خالفت القانون المميز</button>
-                <button class="icon-btn edit-btn" onclick="editSpecialRule('${sr.id}')" title="تعديل نص القانون المميز">✎</button>
-                <button class="icon-btn" onclick="deleteSpecialRule('${sr.id}')" title="حذف القانون المميز">✕</button>
-              </div>
-            </div>
-          `).join('');
-        }
-      }
-
-      const container = document.getElementById('generalRulesListContainer');
-      if (state.rulesData.generalRules.length === 0) {
-        container.innerHTML = `<p class="empty-note">لا توجد قوانين عامة مضافة حالياً. أضف قوانينك في الحقل أعلاه.</p>`;
+      const container = document.getElementById('unifiedRulesListContainer');
+      if (!container) return;
+      if (list.length === 0) {
+        container.innerHTML = `<p class="empty-note">لا توجد قوانين مضافة حالياً. أضف قوانينك وحدد عقوباتها في الأعلى.</p>`;
       } else {
-        container.innerHTML = state.rulesData.generalRules.map((r, idx) => `
-          <div class="rule-item-card">
-            <div class="rule-text-wrap">
-              <span>${idx + 1}. ${r.text}</span>
+        container.innerHTML = list.map((r, idx) => `
+          <div class="rule-item-card" style="border-right-color:var(--amber); background:var(--surface);">
+            <div class="rule-text-wrap" style="display:flex; flex-direction:column; gap:6px;">
+              <span style="font-weight:900;">⚖️ ${idx + 1}. ${hbEsc(r.text)}</span>
+              <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                ${formatRulePenaltyBadgesHtml(r.penalties)}
+              </div>
             </div>
             <div class="rule-actions">
-              <button class="btn btn-danger btn-sm" onclick="violateGeneralRule('${r.id}')">🚨 خالفت القانون</button>
-              <button class="icon-btn edit-btn" onclick="editGeneralRule('${r.id}')" title="تعديل نص القانون">✎</button>
-              <button class="icon-btn" onclick="deleteGeneralRule('${r.id}')" title="حذف القانون">✕</button>
+              <button class="btn btn-danger btn-sm" onclick="violateUnifiedRule('${hbEsc(r.id)}')">🚨 خرقت القانون</button>
+              <button class="icon-btn edit-btn" onclick="editUnifiedRule('${hbEsc(r.id)}')" title="تعديل القانون وعقوباته">✎</button>
+              <button class="icon-btn" onclick="deleteUnifiedRule('${hbEsc(r.id)}')" title="حذف القانون">✕</button>
             </div>
           </div>
         `).join('');
@@ -11531,23 +12371,6 @@
       showAppToast('🌱 تم حفظ ملف البداية الجديدة (Fresh Start JSON) بنجاح!');
     }
 
-    function triggerInAppFreshStart() {
-      openAppConfirmDialog(
-        '🌱 تأكيد البداية الجديدة النظيفة داخل التطبيق الآن',
-        'هل تريد بدء صفحة جديدة على بياض الآن؟\n• سيتم الاحتفاظ بتاب توزيع الوقت (Time Blocking) كاملاً كما هو (أوقات البلوكات، المهام داخل البلوكات، الالتزامات والتذكيرات) والمهام الأسبوعية وتصنيفاتها دون أي تغيير.\n• سيتم تصفير المتتبع الدائري والعادات الدورية (إعادة الـ HP إلى 100% وإلغاء قفل تاريخ البداية)، وتصفير عدّاد الذهب، والإحصائيات، وعدّاد الأمل والأوسمة، وعقوبات الصيام.',
-        function() {
-          const freshObj = buildFreshStartState(state);
-          state = freshObj;
-          safeSetStorage(STORAGE_KEY, JSON.stringify(freshObj));
-          loadState();
-          const startInp = document.getElementById('initialStartDateInput');
-          if (startInp) startInp.value = getSystemTodayYMD();
-          renderAll();
-          showAppToast('🌱 تمت تهيئة بداية جديدة على بياض! حدد تاريخ بدايتك الجديد من تاب المتتبع الدائري.');
-        },
-        false
-      );
-    }
 
     function exportBackupData(sectionKey) {
       saveState();
@@ -11694,7 +12517,7 @@
       const currentSun = getWeekSundayYMD(sysToday);
       const dow = parseYMD(sysToday).getDay(); // 0:Sun, 1:Mon, 2:Tue, 3:Wed, 4:Thu, 5:Fri, 6:Sat
 
-      let existing = state.fastingPenalties.find(p => p.sourceWeekSunday === sourceWeekSunday);
+      let existing = state.fastingPenalties.find(p => p.sourceWeekSunday === sourceWeekSunday && p.status !== 'completed');
       if (existing) {
         if (!existing.reason.includes(reasonText)) {
           existing.reason += ' + ' + reasonText;
@@ -12446,19 +13269,31 @@
       const generalView = document.getElementById('statsGeneralView');
       const detailView = document.getElementById('statsHabitDetailView');
       const compassView = document.getElementById('statsPlanningCompassView');
+      const badgesView = document.getElementById('statsBadgesAndRanksView');
       const btnGen = document.getElementById('btnStatsSub_general');
       const btnComp = document.getElementById('btnStatsSub_compass');
-      const subMode = state.statsSubView === 'compass' ? 'compass' : 'general';
+      const btnBadges = document.getElementById('btnStatsSub_badges');
+      const subMode = (state.statsSubView === 'compass' || state.statsSubView === 'badges') ? state.statsSubView : 'general';
       if (btnGen) btnGen.classList.toggle('active', subMode === 'general');
       if (btnComp) btnComp.classList.toggle('active', subMode === 'compass');
+      if (btnBadges) btnBadges.classList.toggle('active', subMode === 'badges');
       try { renderPlanningCompassAnalytics(); } catch (e) { console.error(e); }
+      try { if (typeof renderBadgesAndRanksView === 'function') renderBadgesAndRanksView(); } catch (e) { console.error(e); }
       if (subMode === 'compass') {
         if (compassView) compassView.style.display = 'block';
+        if (badgesView) badgesView.style.display = 'none';
+        if (generalView) generalView.style.display = 'none';
+        if (detailView) detailView.style.display = 'none';
+        return;
+      } else if (subMode === 'badges') {
+        if (badgesView) badgesView.style.display = 'block';
+        if (compassView) compassView.style.display = 'none';
         if (generalView) generalView.style.display = 'none';
         if (detailView) detailView.style.display = 'none';
         return;
       } else {
         if (compassView) compassView.style.display = 'none';
+        if (badgesView) badgesView.style.display = 'none';
       }
 
       renderRulesAndFastingStats();
@@ -18087,6 +18922,7 @@
       renderFastingPenaltyBanner();
       checkTreeAndShieldProgress();
       checkDisciplineLadderProgression();
+      try { if (typeof evaluateBadgesAndXp === 'function') evaluateBadgesAndXp(true); } catch (e) { console.error(e); }
       checkNewYear2027EmergencyNotice();
       checkWeeklyTasksAndHabitHpEndOfDay();
       try {
@@ -20283,9 +21119,16 @@
     // [NEW MODULE] 4. بوصلة التخطيط الذكي (Planning Analytics) وحساب متوسطات (التصنيف + نوع المهمة) بنافذة متحركة ذكية
     // ============================================================
     function switchStatsSubView(subKey) {
-      state.statsSubView = subKey === 'compass' ? 'compass' : 'general';
+      state.statsSubView = (subKey === 'compass' || subKey === 'badges') ? subKey : 'general';
       saveState();
       renderTab4();
+    }
+
+    function openBadgesAndRanksPage() {
+      state.statsSubView = 'badges';
+      saveState();
+      const tabBtn = document.querySelector('.tab-btn[onclick*="tab4"]');
+      switchTab('tab4', tabBtn);
     }
 
     function ensurePlanningAnalyticsConfig() {
@@ -22313,7 +23156,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
     'taskCategoryEmojis', 'lastStreakResetDate', 'lastStreakResetTimestamp',
     'checkinAfterReset', 'habitCheckinAfterReset', 'hopeCounter', 'newYear2027EmergencyNoticeAck',
     'savedTaskCategories', 'deletedSavedCategories', 'weeklyFixedQuotas', 'tbObligations',
-    'planningAnalyticsConfig', 'planningCalibrationStartDate', 'categoryTaskTypesConfig', 'medicalCurriculum'
+    'planningAnalyticsConfig', 'planningCalibrationStartDate', 'categoryTaskTypesConfig', 'medicalCurriculum', 'achievementsState'
   ];
 
   // ---------- أدوات ----------
@@ -23235,6 +24078,699 @@ ${plan.leftoverSurplusMin >= 15 ? `
   }, 6000);
 })();
 
+  
+    // ================================================================================
+    // [NEW MODULE] منظومة الأوسمة والتحديات (82 وساماً) + نظام الخبرة والألقاب (100+ مستوى / 50 لقباً)
+    // ================================================================================
+    const RANK_ERAS_AND_TITLES = [
+      // العصر 1: البذرة (Lv 1–10)
+      { era: 'عصر البذرة', emoji: '🌱', titles: ['البادئ الشجاع', 'صاحب الشرارة', 'كاسر الكسل', 'طالب الهمّة', 'حارس الفجر'] },
+      // العصر 2: التأسيس (Lv 11–20)
+      { era: 'عصر التأسيس', emoji: '🔥', titles: ['باني العادة', 'منظّم الوقت', 'رفيق المكتب', 'ثابت الخطوة', 'فارس الانضباط'] },
+      // العصر 3: الصمود (Lv 21–30)
+      { era: 'عصر الصمود', emoji: '🛡️', titles: ['حامي الطاقة', 'قاهر التشتت', 'صائد الإنجاز', 'صاحب النَفَس الطويل', 'محارب الثبات'] },
+      // العصر 4: الإتقان (Lv 31–40)
+      { era: 'عصر الإتقان', emoji: '🩺', titles: ['قارئ المنهج', 'مُفكّك الشابترات', 'متمرس الـ QBank', 'طبيب السريرية', 'مايسترو المراجعة'] },
+      // العصر 5: العمق (Lv 41–50)
+      { era: 'عصر العمق', emoji: '💎', titles: ['سيد التركيز', 'مهندس الساعات', 'صانع الماراثون', 'رفيق الكتب الكبرى', 'الطبيب المتقن'] },
+      // العصر 6: النخبة (Lv 51–60)
+      { era: 'عصر النخبة', emoji: '🌟', titles: ['نجم الراوندات', 'قائد القاعة', 'عميد الهمّة', 'حكيم الجداول', 'صاحب البصمة'] },
+      // العصر 7: الريادة (Lv 61–70)
+      { era: 'عصر الريادة', emoji: '🏔️', titles: ['المتفوق الهادئ', 'مرجع الدفعة', 'أسطورة الثبات', 'حامل اللواء', 'قمة الجبل'] },
+      // العصر 8: الحكمة (Lv 71–80)
+      { era: 'عصر الحكمة', emoji: '🦉', titles: ['حكيم الطب', 'إمام التركيز', 'سيد الميدان', 'فخر الكلية', 'صانع الأثر'] },
+      // العصر 9: المجد (Lv 81–90)
+      { era: 'عصر المجد', emoji: '👑', titles: ['تاج الانضباط', 'النجم الساطع', 'أسطورة العام', 'فارس الامتياز', 'ذروة الإتقان'] },
+      // العصر 10: الخلود (Lv 91–100+)
+      { era: 'عصر الخلود', emoji: '🌌', titles: ['عملاق المثابرة', 'سيد المعرفة', 'أسطورة سادسة', 'الطبيب الاستثنائي', 'الأستاذ الأسطوري (Grandmaster)'] }
+    ];
+
+    const BADGE_TIER_META = {
+      bronze:    { label: 'برونزي 🥉', coins: 5,  xp: 50,  jackpot: false },
+      silver:    { label: 'فضي 🥈',    coins: 15, xp: 120, jackpot: false },
+      gold:      { label: 'ذهبي 🥇',   coins: 25, xp: 300, jackpot: true  },
+      legendary: { label: 'أسطوري 👑', coins: 50, xp: 700, jackpot: true  }
+    };
+
+    const BADGE_CATEGORIES_META = [
+      { id: 'all',        label: 'الكل' },
+      { id: 'streak',     label: '🔥 الانضباط والدائري' },
+      { id: 'tasks',      label: '📋 المهام والعادات' },
+      { id: 'curriculum', label: '🩺 شجرة المنهج' },
+      { id: 'qbank_osce', label: '📝 QBank وOSCE' },
+      { id: 'focus',      label: '⏳ التركيز والذهب' },
+      { id: 'quotas_tb',  label: '🕌 الحصص وTime Blocking' },
+      { id: 'resilience', label: '🛡️ الصمود والقوانين' },
+      { id: 'special',    label: '✨ تحديات خاصة' },
+      { id: 'xp_levels',  label: '⚡ طاقة الخبرة والمستويات' }
+    ];
+
+    function getStepXpForLevel(lv) {
+      const n = Math.max(1, Number(lv) || 1);
+      if (n >= 100) return 5000; // Prestige scaling after Lv 100
+      return Math.round(220 + (n - 1) * 35 + Math.pow(n - 1, 1.35) * 4);
+    }
+
+    function getRankInfoFromTotalXp(totalXp) {
+      let rem = Math.max(0, Math.floor(Number(totalXp) || 0));
+      let level = 1;
+      while (true) {
+        const need = getStepXpForLevel(level);
+        if (rem >= need) {
+          rem -= need;
+          level++;
+          if (level > 999) break;
+        } else {
+          break;
+        }
+      }
+      const needNext = getStepXpForLevel(level);
+      const pct = needNext > 0 ? Math.min(100, Math.round((rem / needNext) * 100)) : 100;
+      const cappedLv = Math.min(100, level);
+      const eraIdx = Math.min(9, Math.floor((cappedLv - 1) / 10));
+      const titleIdx = Math.min(4, Math.floor(((cappedLv - 1) % 10) / 2));
+      const eraObj = RANK_ERAS_AND_TITLES[eraIdx];
+      const isPrestige = level > 100;
+      const title = isPrestige
+        ? `${eraObj.titles[4]} ★${level - 100}`
+        : eraObj.titles[titleIdx];
+      return {
+        level,
+        isPrestige,
+        era: isPrestige ? 'عصر الخلود (Prestige)' : eraObj.era,
+        emoji: eraObj.emoji,
+        title,
+        totalXp: Math.max(0, Math.floor(Number(totalXp) || 0)),
+        inLevelXp: rem,
+        needForNextXp: needNext,
+        remainingXp: Math.max(0, needNext - rem),
+        pct
+      };
+    }
+
+    function ensureAchievementsState() {
+      if (!state.achievementsState || typeof state.achievementsState !== 'object') {
+        state.achievementsState = {
+          unlocked: {},
+          highestLevelAck: 1,
+          filterCat: 'all',
+          filterStatus: 'all'
+        };
+      }
+      if (!state.achievementsState.unlocked || typeof state.achievementsState.unlocked !== 'object') {
+        state.achievementsState.unlocked = {};
+      }
+      if (typeof state.achievementsState.highestLevelAck !== 'number' || state.achievementsState.highestLevelAck < 1) {
+        state.achievementsState.highestLevelAck = 1;
+      }
+      return state.achievementsState;
+    }
+
+    // 82 وساماً وتحدياً طويل المدى موزعة على 9 مسارات
+    const BADGES_CATALOG = [
+      // 1. الانضباط والمتتبع الدائري (12)
+      { id: 'b_str_1',   cat: 'streak', tier: 'bronze',    emoji: '✨', title: 'الشرارة الأولى',        desc: 'أنجز أول يوم انضباط أخضر في المتتبع الدائري.',      target: 1,   val: m => m.greenDays },
+      { id: 'b_str_3',   cat: 'streak', tier: 'bronze',    emoji: '🔥', title: 'بداية قوية',            desc: 'حافظ على 3 أيام انضباط متتالية.',                    target: 3,   val: m => m.bestStreak },
+      { id: 'b_str_7',   cat: 'streak', tier: 'silver',    emoji: '⚡', title: 'أسبوع الصمود',          desc: '7 أيام متتالية من الانضباط المتواصل.',               target: 7,   val: m => m.bestStreak },
+      { id: 'b_str_14',  cat: 'streak', tier: 'silver',    emoji: '🛡️', title: 'الفارس الصامد',         desc: '14 يوماً متتالياً بدون انقطاع.',                      target: 14,  val: m => m.bestStreak },
+      { id: 'b_str_30',  cat: 'streak', tier: 'gold',      emoji: '🌙', title: 'أسطورة الشهر',          desc: '30 يوماً متتالياً من الانضباط الصلب.',               target: 30,  val: m => m.bestStreak },
+      { id: 'b_str_60',  cat: 'streak', tier: 'gold',      emoji: '⛰️', title: 'جبل الشهرين',           desc: '60 يوماً متتالياً من الثبات.',                       target: 60,  val: m => m.bestStreak },
+      { id: 'b_str_90',  cat: 'streak', tier: 'gold',      emoji: '🦅', title: 'صقر الـ 90 يوماً',      desc: '90 يوماً متتالياً — عادة راسخة مدى الحياة.',         target: 90,  val: m => m.bestStreak },
+      { id: 'b_str_180', cat: 'streak', tier: 'legendary', emoji: '👑', title: 'بطل نصف العام',         desc: '180 يوماً من الانضباط المتتالي.',                    target: 180, val: m => m.bestStreak },
+      { id: 'b_str_365', cat: 'streak', tier: 'legendary', emoji: '🌌', title: 'أسطورة العام الكامل',   desc: '365 يوماً متتالياً من الالتزام الاستثنائي.',          target: 365, val: m => m.bestStreak },
+      { id: 'b_gw_1',    cat: 'streak', tier: 'silver',    emoji: '💚', title: 'أسبوع أخضر مثالي',      desc: 'أتمّ 100% من المتتبع الدائري باللون الأخضر لأسبوع.', target: 1,   val: m => m.perfectGreenWeeks },
+      { id: 'b_gw_4',    cat: 'streak', tier: 'gold',      emoji: '🌿', title: 'شهر الحدائق الخضراء',   desc: 'حقق 4 أسابيع خضراء 100% في المتتبع الدائري.',        target: 4,   val: m => m.perfectGreenWeeks },
+      { id: 'b_gw_12',   cat: 'streak', tier: 'legendary', emoji: '🌳', title: 'غابة الانضباط',         desc: 'حقق 12 أسبوعاً أخضر 100% على مدار رحلتك.',           target: 12,  val: m => m.perfectGreenWeeks },
+
+      // 2. المهام الدورية والأسبوعية (11)
+      { id: 'b_tsk_1',   cat: 'tasks', tier: 'bronze',    emoji: '📌', title: 'أول مهمة منجزة',         desc: 'أكمل أول مهمة دراسية في قائمة الأسبوع.',             target: 1,   val: m => m.completedTasks },
+      { id: 'b_tsk_10',  cat: 'tasks', tier: 'bronze',    emoji: '📋', title: 'عشرة على عشرة',          desc: 'أكمل 10 مهام دراسية أسبوعية.',                       target: 10,  val: m => m.completedTasks },
+      { id: 'b_tsk_50',  cat: 'tasks', tier: 'silver',    emoji: '🎯', title: 'آلة الإنجاز',            desc: 'أكمل 50 مهمة دراسية تراكمياً.',                      target: 50,  val: m => m.completedTasks },
+      { id: 'b_tsk_150', cat: 'tasks', tier: 'gold',      emoji: '🏆', title: 'عميد المهام',            desc: 'أكمل 150 مهمة دراسية تراكمياً.',                     target: 150, val: m => m.completedTasks },
+      { id: 'b_tsk_300', cat: 'tasks', tier: 'legendary', emoji: '🌠', title: 'أسطورة الـ 300 مهمة',   desc: 'أكمل 300 مهمة دراسية طوال العام.',                   target: 300, val: m => m.completedTasks },
+      { id: 'b_ep_10',   cat: 'tasks', tier: 'silver',    emoji: '⭐', title: 'قناص الـ 4 نجوم',        desc: 'أنجز 10 مهام ملحمية بتقييم 4 نجوم.',                 target: 10,  val: m => m.epic4Tasks },
+      { id: 'b_ep_30',   cat: 'tasks', tier: 'gold',      emoji: '🌟', title: 'سيد المهام الملحمية',    desc: 'أنجز 30 مهمة ملحمية بتقييم 4 نجوم.',                 target: 30,  val: m => m.epic4Tasks },
+      { id: 'b_w80_1',   cat: 'tasks', tier: 'bronze',    emoji: '✅', title: 'صاحب الـ 80%',           desc: 'حقق شرط إنجاز 80% فأكثر من مهام الأسبوع.',           target: 1,   val: m => m.weeks80Plus },
+      { id: 'b_w80_4',   cat: 'tasks', tier: 'silver',    emoji: '🏔️', title: 'ثبات الجبال',            desc: 'حقق 4 أسابيع متتالية فوق 80% إنجاز.',                target: 4,   val: m => m.maxConsecWeeks80 },
+      { id: 'b_w80_12',  cat: 'tasks', tier: 'gold',      emoji: '🎖️', title: 'بطل الثلاثة أشهر',       desc: 'حقق 12 أسبوعاً فوق 80% من المهام الأسبوعية.',        target: 12,  val: m => m.weeks80Plus },
+      { id: 'b_w100_1',  cat: 'tasks', tier: 'gold',      emoji: '💯', title: 'الاكتساح الكامل',        desc: 'أكمل 100% من جميع مهام الأسبوع المخططة + يوم مهام دورية كامل.', target: 1, val: m => m.weeks100Plus },
+
+      // 3. شجرة المنهج الطبي (11)
+      { id: 'b_cur_l1',   cat: 'curriculum', tier: 'bronze',    emoji: '📖', title: 'أول درس في المنهج',    desc: 'أكمل أول درس من شجرة مادة طبية.',                    target: 1,   val: m => m.doneLessons },
+      { id: 'b_cur_l10',  cat: 'curriculum', tier: 'bronze',    emoji: '📚', title: 'انطلاقة المنهج',       desc: 'أكمل 10 دروس من شجرة المنهج الطبي.',                 target: 10,  val: m => m.doneLessons },
+      { id: 'b_cur_l50',  cat: 'curriculum', tier: 'silver',    emoji: '🩺', title: 'خمسون درساً سريرياً',  desc: 'أكمل 50 درساً في شجرة المواد الطبية.',               target: 50,  val: m => m.doneLessons },
+      { id: 'b_cur_l150', cat: 'curriculum', tier: 'gold',      emoji: '🧠', title: 'موسوعة الامتياز',      desc: 'أكمل 150 درساً في شجرة المواد الطبية.',              target: 150, val: m => m.doneLessons },
+      { id: 'b_cur_l300', cat: 'curriculum', tier: 'legendary', emoji: '👑', title: 'سيد المنهج الطبي',     desc: 'أكمل 300 درس في شجرة المواد الطبية.',                target: 300, val: m => m.doneLessons },
+      { id: 'b_cur_m1',   cat: 'curriculum', tier: 'bronze',    emoji: '📦', title: 'فاتح الموديول',        desc: 'أتمّ 100% من أول Module في مادة طبية.',              target: 1,   val: m => m.doneModules },
+      { id: 'b_cur_m10',  cat: 'curriculum', tier: 'silver',    emoji: '🗂️', title: 'مُنجز العشر موديولات', desc: 'أتمّ 10 Modules كاملة في المنهج.',                   target: 10,  val: m => m.doneModules },
+      { id: 'b_cur_c1',   cat: 'curriculum', tier: 'silver',    emoji: '🗺️', title: 'قاهر الشابتر',         desc: 'أتمّ 100% من أول Chapter كامل.',                     target: 1,   val: m => m.doneChapters },
+      { id: 'b_cur_c5',   cat: 'curriculum', tier: 'gold',      emoji: '⚔️', title: 'فاتح الشابترات',       desc: 'أتمّ 5 Chapters كاملة بنسبة 100%.',                  target: 5,   val: m => m.doneChapters },
+      { id: 'b_cur_s1',   cat: 'curriculum', tier: 'gold',      emoji: '🎓', title: 'ختم أول مادة طبية',    desc: 'أتمّ 100% من مادة طبية كاملة بكل شابتراتها.',        target: 1,   val: m => m.doneSubjects },
+      { id: 'b_cur_s4',   cat: 'curriculum', tier: 'legendary', emoji: '⚕️', title: 'ختم المواد الأربع الكبرى', desc: 'أتمّ 100% من 4 مواد طبية كبرى بالكامل.',         target: 4,   val: m => m.doneSubjects },
+
+      // 4. بنوك الأسئلة والعملي OSCE (8)
+      { id: 'b_qb_1',   cat: 'qbank_osce', tier: 'bronze',    emoji: '📝', title: 'أول بلوك QBank',       desc: 'أكمل أول جلسة بنوك أسئلة (QBank).',                  target: 1,   val: m => m.qbankDone },
+      { id: 'b_qb_10',  cat: 'qbank_osce', tier: 'silver',    emoji: '🎯', title: 'مايسترو الـ QBank',    desc: 'أكمل 10 جلسات بنوك أسئلة.',                          target: 10,  val: m => m.qbankDone },
+      { id: 'b_qb_30',  cat: 'qbank_osce', tier: 'gold',      emoji: '💡', title: 'صائد الأسئلة السريرية',desc: 'أكمل 30 جلسة QBank.',                                target: 30,  val: m => m.qbankDone },
+      { id: 'b_qb_100', cat: 'qbank_osce', tier: 'legendary', emoji: '🏆', title: 'نادي المئة QBank',     desc: 'أكمل 100 جلسة بنوك أسئلة طوال السنة.',               target: 100, val: m => m.qbankDone },
+      { id: 'b_os_1',   cat: 'qbank_osce', tier: 'bronze',    emoji: '🩺', title: 'أول محطة OSCE',        desc: 'أكمل أول محطة فحص سريري أو تاريخ مرضي.',             target: 1,   val: m => m.osceDone },
+      { id: 'b_os_10',  cat: 'qbank_osce', tier: 'silver',    emoji: '🗣️', title: 'الطبيب السريري',       desc: 'أكمل 10 محطات OSCE (Examination / History).',        target: 10,  val: m => m.osceDone },
+      { id: 'b_os_30',  cat: 'qbank_osce', tier: 'gold',      emoji: '🏥', title: 'نجم الراوندات',        desc: 'أكمل 30 محطة OSCE.',                                 target: 30,  val: m => m.osceDone },
+      { id: 'b_os_100', cat: 'qbank_osce', tier: 'legendary', emoji: '👑', title: 'أسطورة الـ OSCE',      desc: 'أكمل 100 محطة فحص وتاريخ مرضي.',                     target: 100, val: m => m.osceDone },
+
+      // 5. التركيز العميق وعدّاد الذهب (11)
+      { id: 'b_fc_s1',    cat: 'focus', tier: 'bronze',    emoji: '⏳', title: 'كاسر الكسل',           desc: 'أكمل أول جلسة في «فقط ابدأ» أو «عدّاد الذهب».',       target: 1,    val: m => m.totalSessions },
+      { id: 'b_fc_60m',   cat: 'focus', tier: 'bronze',    emoji: '🪙', title: 'ساعة التركيز الذهبي',  desc: 'أكمل جلسة متواصلة 60 دقيقة فأكثر.',                  target: 60,   val: m => m.maxSingleSessionMin },
+      { id: 'b_fc_day6',  cat: 'focus', tier: 'silver',    emoji: '🏃', title: 'ماراثون الطبيب',       desc: 'سجّل 6 ساعات مذاكرة في يوم واحد.',                   target: 360,  val: m => m.maxDailyStudyMin },
+      { id: 'b_fc_h10',   cat: 'focus', tier: 'bronze',    emoji: '⏱️', title: 'نادي الـ 10 ساعات',    desc: 'اجمع 10 ساعات مذاكرة مسجلة.',                        target: 10,   val: m => m.totalStudyHours },
+      { id: 'b_fc_h25',   cat: 'focus', tier: 'silver',    emoji: '🕯️', title: 'نادي الـ 25 ساعة',     desc: 'اجمع 25 ساعة مذاكرة مسجلة.',                         target: 25,   val: m => m.totalStudyHours },
+      { id: 'b_fc_h100',  cat: 'focus', tier: 'gold',      emoji: '💎', title: 'نادي الـ 100 ساعة',    desc: 'اجمع 100 ساعة مذاكرة حقيقية.',                       target: 100,  val: m => m.totalStudyHours },
+      { id: 'b_fc_h300',  cat: 'focus', tier: 'gold',      emoji: '🔥', title: 'نادي الـ 300 ساعة',    desc: 'اجمع 300 ساعة مذاكرة عميقة.',                        target: 300,  val: m => m.totalStudyHours },
+      { id: 'b_fc_h500',  cat: 'focus', tier: 'legendary', emoji: '⚡', title: 'نادي الـ 500 ساعة',    desc: 'نصف ألفية من ساعات التركيز الطبي.',                  target: 500,  val: m => m.totalStudyHours },
+      { id: 'b_fc_h1000', cat: 'focus', tier: 'legendary', emoji: '🌌', title: 'أسطورة الألف ساعة',    desc: 'اجمع 1000 ساعة مذاكرة — إنجاز تاريخي.',              target: 1000, val: m => m.totalStudyHours },
+      { id: 'b_gd_100',   cat: 'focus', tier: 'silver',    emoji: '💰', title: 'ثريّ الذهب',           desc: 'اجمع 100 عملة ذهبية تراكمياً.',                      target: 100,  val: m => m.totalGoldEarned },
+      { id: 'b_gd_1000',  cat: 'focus', tier: 'legendary', emoji: '👑', title: 'خزينة السلطان',        desc: 'اجمع 1000 عملة ذهبية تراكمياً.',                     target: 1000, val: m => m.totalGoldEarned },
+
+      // 6. الحصص الأسبوعية الثابتة وTime Blocking (7)
+      { id: 'b_q_anki1', cat: 'quotas_tb', tier: 'bronze',    emoji: '🃏', title: 'صديق أنكي',           desc: 'قفّل 100% من حصة Anki لأسبوع كامل.',                 target: 1,  val: m => m.ankiFullWeeks },
+      { id: 'b_q_anki4', cat: 'quotas_tb', tier: 'silver',    emoji: '🧠', title: 'ذاكرة فولاذية',        desc: 'قفّل حصة Anki 100% في 4 أسابيع.',                    target: 4,  val: m => m.ankiFullWeeks },
+      { id: 'b_q_qur1',  cat: 'quotas_tb', tier: 'bronze',    emoji: '📖', title: 'أهل القرآن',          desc: 'قفّل 100% من حصة القرآن لأسبوع كامل.',               target: 1,  val: m => m.quranFullWeeks },
+      { id: 'b_q_qur4',  cat: 'quotas_tb', tier: 'silver',    emoji: '🕌', title: 'بركة الورد الدائم',   desc: 'قفّل حصة القرآن 100% في 4 أسابيع.',                  target: 4,  val: m => m.quranFullWeeks },
+      { id: 'b_q_all12', cat: 'quotas_tb', tier: 'legendary', emoji: '🌟', title: 'الالتزام المزدوج',    desc: 'قفّل جميع الحصص الأسبوعية الثابتة في 12 أسبوعاً.',    target: 12, val: m => m.allQuotasFullWeeks },
+      { id: 'b_tb_1',    cat: 'quotas_tb', tier: 'bronze',    emoji: '🗓️', title: 'مهندس الوقت',         desc: 'أنجز جميع بلوكات Time Blocking ليوم كامل.',          target: 1,  val: m => m.perfectTbDays },
+      { id: 'b_tb_10',   cat: 'quotas_tb', tier: 'gold',      emoji: '⏱️', title: 'سيد البلوكات',        desc: 'أنجز جميع بلوكات Time Blocking في 10 أيام.',         target: 10, val: m => m.perfectTbDays },
+
+      // 7. القوانين وطاقة الصمود 100 HP (5)
+      { id: 'b_hp_1',    cat: 'resilience', tier: 'silver',    emoji: '🛡️', title: 'درع الفولاذ',        desc: 'أنهِ أسبوعاً كاملاً بطاقة صمود 100 HP كاملة.',       target: 1,  val: m => m.perfect100HpWeeks },
+      { id: 'b_hp_4',    cat: 'resilience', tier: 'gold',      emoji: '💎', title: 'الحصن المنيع',       desc: 'أنهِ 4 أسابيع بطاقة 100 HP دون أي خصم.',             target: 4,  val: m => m.perfect100HpWeeks },
+      { id: 'b_law_1',   cat: 'resilience', tier: 'bronze',    emoji: '⚖️', title: 'النقاء الكامل',      desc: 'أسبوع كامل بلا أي خرق في «القوانين».',               target: 1,  val: m => m.cleanLawWeeks },
+      { id: 'b_law_4',   cat: 'resilience', tier: 'gold',      emoji: '🕊️', title: 'حارس الوعد',         desc: '4 أسابيع بلا أي مخالفة قوانين أو عقوبة صيام.',       target: 4,  val: m => m.cleanLawWeeks },
+      { id: 'b_law_12',  cat: 'resilience', tier: 'legendary', emoji: '👑', title: 'سيد النفس',          desc: '12 أسبوعاً نظيفاً بلا أي مخالفة قوانين.',            target: 12, val: m => m.cleanLawWeeks },
+
+      // 8. التحديات الخاصة (5)
+      { id: 'b_sp_fajr',   cat: 'special', tier: 'silver', emoji: '🌅', title: 'الفجر المبارك',        desc: 'سجّل جلسة مذاكرة في البكور (بين 3:30 و7:00 صباحاً).', target: 1, val: m => m.fajrSessions },
+      { id: 'b_sp_habday', cat: 'special', tier: 'bronze', emoji: '🔄', title: 'يوم الإتقان اليومي',   desc: 'أتمّ 100% من جميع المهام الدورية المطلوبة في يوم واحد.', target: 1, val: m => m.perfectDailyHabitDays },
+      { id: 'b_sp_come',   cat: 'special', tier: 'silver', emoji: '🦅', title: 'العائد الأقوى',        desc: 'عد لأسبوع إنجاز 80%+ مباشرة بعد أسبوع تعثر.',          target: 1, val: m => m.comebackWeeks },
+      { id: 'b_sp_silent', cat: 'special', tier: 'silver', emoji: '🧘', title: 'المثابرة الصامتة',     desc: 'أنجز يوم مذاكرة (60+ د) دون أي مكافأة جاكبوت.',        target: 1, val: m => m.silentPerseveranceDays },
+      { id: 'b_sp_full',   cat: 'special', tier: 'gold',   emoji: '💎', title: 'اليوم الذهبي الشامل',  desc: 'اجمع في يوم واحد: مذاكرة + حصة ثابتة + مهمة أسبوعية + يوم أخضر.', target: 1, val: m => m.goldenCompleteDays },
+
+      // 9. طاقة الخبرة والمستويات (12)
+      { id: 'b_xp_1k',    cat: 'xp_levels', tier: 'bronze',    emoji: '🌱', title: 'بذرة الخبرة',         desc: 'اجمع 1,000 نقطة خبرة (XP) تراكمية.',                  target: 1000,   val: m => m.totalXp },
+      { id: 'b_xp_5k',    cat: 'xp_levels', tier: 'silver',    emoji: '💧', title: 'ينبوع الخبرة',        desc: 'اجمع 5,000 نقطة خبرة (XP) تراكمية.',                  target: 5000,   val: m => m.totalXp },
+      { id: 'b_xp_15k',   cat: 'xp_levels', tier: 'silver',    emoji: '🌊', title: 'نهر الخبرة',          desc: 'اجمع 15,000 نقطة خبرة (XP) تراكمية.',                 target: 15000,  val: m => m.totalXp },
+      { id: 'b_xp_40k',   cat: 'xp_levels', tier: 'gold',      emoji: '⚓', title: 'بحر الخبرة',          desc: 'اجمع 40,000 نقطة خبرة (XP) تراكمية.',                 target: 40000,  val: m => m.totalXp },
+      { id: 'b_xp_100k',  cat: 'xp_levels', tier: 'legendary', emoji: '🌍', title: 'محيط الخبرة',         desc: 'اجمع 100,000 نقطة خبرة (XP) تراكمية.',                target: 100000, val: m => m.totalXp },
+      { id: 'b_xp_200k',  cat: 'xp_levels', tier: 'legendary', emoji: '🌌', title: 'أسطورة المئتين',      desc: 'اجمع 200,000 نقطة خبرة (XP) تراكمية.',                target: 200000, val: m => m.totalXp },
+      { id: 'b_lv_10',    cat: 'xp_levels', tier: 'bronze',    emoji: '🔟', title: 'عبور المستوى 10',     desc: 'صل إلى المستوى 10 في سلّم الخبرة والألقاب.',           target: 10,     val: m => m.level },
+      { id: 'b_lv_25',    cat: 'xp_levels', tier: 'silver',    emoji: '🛡️', title: 'عبور المستوى 25',     desc: 'صل إلى المستوى 25 — ربع طريق القمة.',                 target: 25,     val: m => m.level },
+      { id: 'b_lv_50',    cat: 'xp_levels', tier: 'gold',      emoji: '💎', title: 'نصف الطريق — Lv 50',  desc: 'صل إلى المستوى 50 — إنجاز استثنائي.',                 target: 50,     val: m => m.level },
+      { id: 'b_lv_75',    cat: 'xp_levels', tier: 'gold',      emoji: '🦉', title: 'نخبة الـ 75',         desc: 'صل إلى المستوى 75 في عصر الحكمة.',                    target: 75,     val: m => m.level },
+      { id: 'b_lv_100',   cat: 'xp_levels', tier: 'legendary', emoji: '👑', title: 'نادي المئة — Lv 100', desc: 'صل إلى المستوى 100 ولقب الأستاذ الأسطوري!',           target: 100,    val: m => m.level },
+      { id: 'b_lv_101',   cat: 'xp_levels', tier: 'legendary', emoji: '🌠', title: 'ما بعد القمة (Prestige)', desc: 'تجاوز المستوى 100 إلى مستويات الـ Prestige المفتوحة!', target: 101, val: m => m.level }
+    ];
+
+    function computeUserLiveStatsForBadges() {
+      const logs = Array.isArray(state.studyTimeLogs) ? state.studyTimeLogs : [];
+      const tasks = (Array.isArray(state.studyTasks) ? state.studyTasks : []).filter(t => t && !(['st_1', 'st_2', 'st_3', 'st_4'].includes(t.id) && !t.done));
+      const sysToday = getSystemTodayYMD();
+
+      let totalStudyMin = 0;
+      let maxSingleSessionMin = 0;
+      let fajrSessions = 0;
+      const dailyStudyMap = {};
+      const quotaLogDays = new Set();
+
+      logs.forEach(l => {
+        if (!l) return;
+        const m = Number(l.durationMinutes) || 0;
+        if (m <= 0) return;
+        totalStudyMin += m;
+        if (m > maxSingleSessionMin) maxSingleSessionMin = m;
+        const dt = new Date(l.timestamp);
+        const ymd = formatDateYMD(dt);
+        dailyStudyMap[ymd] = (dailyStudyMap[ymd] || 0) + m;
+        const hr = dt.getHours() + dt.getMinutes() / 60;
+        if (hr >= 3.5 && hr <= 7.0) fajrSessions++;
+        if (l.kind === 'quota' || l.quotaId) quotaLogDays.add(ymd);
+      });
+      const maxDailyStudyMin = Object.values(dailyStudyMap).reduce((a, b) => Math.max(a, b), 0);
+      const totalStudyHours = Math.round((totalStudyMin / 60) * 10) / 10;
+
+      // المهام الأسبوعية
+      const completedTasksList = tasks.filter(t => t.done);
+      const completedTasks = completedTasksList.length;
+      const epic4Tasks = completedTasksList.filter(t => Number(t.stars) === 4).length;
+      const qbankDone = completedTasksList.filter(t => t.taskTypeId === 'qbank').length +
+        logs.filter(l => l && l.kind === 'category' && l.taskTypeId === 'qbank' && (Number(l.durationMinutes) || 0) >= 15).length;
+      const osceDone = completedTasksList.filter(t => t.taskTypeId === 'osce_exam' || t.taskTypeId === 'osce_history' || t.taskTypeId === 'osce').length +
+        logs.filter(l => l && l.kind === 'category' && (l.taskTypeId === 'osce_exam' || l.taskTypeId === 'osce_history' || l.taskTypeId === 'osce') && (Number(l.durationMinutes) || 0) >= 10).length;
+
+      const starXpMap = { 1: 25, 2: 45, 3: 70, 4: 100 };
+      const completedTasksXp = completedTasksList.reduce((acc, t) => acc + (starXpMap[Number(t.stars) || 3] || 70), 0);
+
+      // الأسابيع التي حققت 80%+ و100%
+      const weekMap = {};
+      tasks.forEach(t => {
+        if (!t.weekSunday) return;
+        if (!weekMap[t.weekSunday]) weekMap[t.weekSunday] = { total: 0, done: 0 };
+        weekMap[t.weekSunday].total++;
+        if (t.done) weekMap[t.weekSunday].done++;
+      });
+      const sortedWeeks = Object.keys(weekMap).sort();
+      let weeks80Plus = 0, weeks100Plus = 0, consec80 = 0, maxConsecWeeks80 = 0, comebackWeeks = 0;
+      let prevFailed = false;
+      sortedWeeks.forEach(sun => {
+        const w = weekMap[sun];
+        const pct = w.total > 0 ? (w.done / w.total) * 100 : 0;
+        if (pct >= 80) {
+          weeks80Plus++;
+          consec80++;
+          if (consec80 > maxConsecWeeks80) maxConsecWeeks80 = consec80;
+          if (prevFailed) comebackWeeks++;
+          prevFailed = false;
+        } else {
+          consec80 = 0;
+          if (sun < getWeekSundayYMD(sysToday)) prevFailed = true;
+        }
+        if (w.total >= 3 && w.done === w.total) weeks100Plus++;
+      });
+
+      // شجرة المنهج الطبي
+      let doneLessons = 0, doneModules = 0, doneChapters = 0, doneSubjects = 0;
+      const mc = ensureMedicalCurriculum();
+      Object.keys(mc).forEach(subj => {
+        const st = getSubjectCurriculumStats(subj);
+        doneLessons += st.doneLessons;
+        doneModules += st.doneModules;
+        doneChapters += st.doneChapters;
+        if (st.totalLessons > 0 && st.doneLessons === st.totalLessons) doneSubjects++;
+      });
+
+      // المتتبع الدائري والاستريك
+      const dayLogs = state.logs || {};
+      const activeHabits = Array.isArray(state.habits) ? state.habits : [];
+      let greenDays = 0;
+      const greenDaySet = new Set();
+      Object.keys(dayLogs).forEach(d => {
+        const rec = dayLogs[d] || {};
+        const vals = Object.values(rec);
+        if (vals.length > 0 && vals.every(v => v === 'green')) {
+          greenDays++;
+          greenDaySet.add(d);
+        }
+      });
+      const currentStreak = (typeof calculateOverallStreak === 'function') ? (calculateOverallStreak() || 0) : 0;
+      const bestStreak = Math.max(currentStreak, greenDays > 0 ? Math.min(greenDays, currentStreak) : 0, (state.achievementsState && state.achievementsState.bestStreakRecorded) || 0);
+      if (state.achievementsState && bestStreak > (state.achievementsState.bestStreakRecorded || 0)) {
+        state.achievementsState.bestStreakRecorded = bestStreak;
+      }
+
+      // الأسابيع الخضراء 100%
+      const weekGreenCounts = {};
+      greenDaySet.forEach(d => {
+        const sun = getWeekSundayYMD(d);
+        weekGreenCounts[sun] = (weekGreenCounts[sun] || 0) + 1;
+      });
+      const perfectGreenWeeks = Object.values(weekGreenCounts).filter(c => c >= 7).length;
+
+      // العادات الدورية
+      const habitsV2 = Array.isArray(state.habitsV2) ? state.habitsV2 : [];
+      let completedDailyHabits = 0;
+      habitsV2.forEach(h => {
+        if (h && h.done && h.lastDoneDate) completedDailyHabits++;
+        if (h && h.history && typeof h.history === 'object') {
+          completedDailyHabits += Object.values(h.history).filter(Boolean).length;
+        }
+      });
+      const dueTodayHabits = habitsV2.filter(h => isHabitV2DueOnDate(h, sysToday));
+      const allDueTodayDone = dueTodayHabits.length > 0 && dueTodayHabits.every(h => h.done && h.lastDoneDate === sysToday);
+      const perfectDailyHabitDays = allDueTodayDone ? 1 : 0;
+
+      // الحصص الأسبوعية الثابتة
+      const quotas = ensureWeeklyFixedQuotas();
+      const logWeeksSet = new Set(logs.map(l => l ? getWeekSundayYMD(formatDateYMD(new Date(l.timestamp))) : '').filter(Boolean));
+      let ankiFullWeeks = 0, quranFullWeeks = 0, allQuotasFullWeeks = 0;
+      logWeeksSet.forEach(sun => {
+        let allMet = quotas.length > 0;
+        quotas.forEach(q => {
+          const target = getWeeklyQuotaNetTargetMinutes(q);
+          const done = getWeeklyQuotaLoggedMinutes(q, sun);
+          const met = target > 0 && done >= target;
+          if (!met) allMet = false;
+          if (met && (q.id === 'wq_anki' || /anki|أنكي/i.test(q.title || ''))) ankiFullWeeks++;
+          if (met && (q.id === 'wq_quran' || /قرآن|quran/i.test(q.title || ''))) quranFullWeeks++;
+        });
+        if (allMet) allQuotasFullWeeks++;
+      });
+
+      // Time Blocking أيام مكتملة
+      let perfectTbDays = 0;
+      const tbByDate = (state.timeBlocking && state.timeBlocking.blocksByDate) ? state.timeBlocking.blocksByDate : {};
+      Object.values(tbByDate).forEach(arr => {
+        if (Array.isArray(arr) && arr.length > 0 && arr.every(b => b && b.done)) perfectTbDays++;
+      });
+
+      // طاقة الصمود 100 HP والأسابيع النظيفة من المخالفات
+      const hpHist = state.hpWeekHistory || {};
+      const perfect100HpWeeks = Object.values(hpHist).filter(v => Number(v) >= 100).length;
+      const vLogs = (state.rulesData && Array.isArray(state.rulesData.violationLogs)) ? state.rulesData.violationLogs : [];
+      const violatedWeeks = new Set(vLogs.map(v => v && v.weekSunday).filter(Boolean));
+      const pastWeeksTotal = state.startDate ? Math.max(0, Math.floor(diffDays(state.startDate, sysToday) / 7)) : 0;
+      const cleanLawWeeks = Math.max(0, pastWeeksTotal - violatedWeeks.size);
+
+      // المثابرة الصامتة واليوم الذهبي الشامل
+      const jackpotWinDays = new Set(((state.monthlyJackpot && state.monthlyJackpot.rewardsWon) || []).map(r => r && r.date).filter(Boolean));
+      let silentPerseveranceDays = 0;
+      let goldenCompleteDays = 0;
+      const taskDoneDays = new Set(completedTasksList.map(t => t.completedAt).filter(Boolean));
+      Object.keys(dailyStudyMap).forEach(d => {
+        if (dailyStudyMap[d] >= 60 && !jackpotWinDays.has(d)) silentPerseveranceDays++;
+        if (dailyStudyMap[d] >= 30 && quotaLogDays.has(d) && taskDoneDays.has(d) && greenDaySet.has(d)) goldenCompleteDays++;
+      });
+
+      const gw = state.goldWallet || {};
+      const spentCoins = Array.isArray(gw.purchases) ? gw.purchases.reduce((a, p) => a + (Number(p && p.priceCoins) || 0), 0) : 0;
+      const totalGoldEarned = (Number(gw.coins) || 0) + spentCoins;
+
+      // حساب XP النشاط + XP الأوسمة المفتوحة
+      const ach = ensureAchievementsState();
+      let badgesXp = 0;
+      BADGES_CATALOG.forEach(b => {
+        if (ach.unlocked[b.id]) {
+          badgesXp += (BADGE_TIER_META[b.tier] ? BADGE_TIER_META[b.tier].xp : 50);
+        }
+      });
+
+      const activityXp =
+        Math.round(totalStudyHours * 30) +
+        completedTasksXp +
+        (doneLessons * 35) + (doneModules * 100) + (doneChapters * 350) +
+        (greenDays * 25) + (perfectGreenWeeks * 250) +
+        (completedDailyHabits * 15);
+
+      const totalXp = activityXp + badgesXp;
+      const rankInfo = getRankInfoFromTotalXp(totalXp);
+
+      return {
+        totalStudyHours,
+        maxSingleSessionMin,
+        maxDailyStudyMin,
+        totalSessions: logs.length,
+        fajrSessions,
+        totalGoldEarned,
+        completedTasks,
+        epic4Tasks,
+        qbankDone,
+        osceDone,
+        weeks80Plus,
+        weeks100Plus,
+        maxConsecWeeks80,
+        comebackWeeks,
+        doneLessons,
+        doneModules,
+        doneChapters,
+        doneSubjects,
+        greenDays,
+        bestStreak,
+        perfectGreenWeeks,
+        completedDailyHabits,
+        perfectDailyHabitDays,
+        ankiFullWeeks,
+        quranFullWeeks,
+        allQuotasFullWeeks,
+        perfectTbDays,
+        perfect100HpWeeks,
+        cleanLawWeeks,
+        silentPerseveranceDays,
+        goldenCompleteDays,
+        totalXp,
+        level: rankInfo.level,
+        rankInfo
+      };
+    }
+
+    window._badgePopupQueue = window._badgePopupQueue || [];
+    let _isEvaluatingBadges = false;
+
+    function enqueueBadgeCelebrationPopup(item) {
+      window._badgePopupQueue = window._badgePopupQueue || [];
+      window._badgePopupQueue.push(item);
+      const ov = document.getElementById('badgeUnlockModalOverlay');
+      if (ov && ov.style.display !== 'flex') {
+        showNextBadgeUnlockModal();
+      }
+    }
+
+    function showNextBadgeUnlockModal() {
+      const ov = document.getElementById('badgeUnlockModalOverlay');
+      if (!ov) return;
+      if (!window._badgePopupQueue || window._badgePopupQueue.length === 0) {
+        ov.style.display = 'none';
+        return;
+      }
+      const cur = window._badgePopupQueue.shift();
+      const kicker = document.getElementById('badgeModalKicker');
+      const emoji = document.getElementById('badgeModalEmoji');
+      const title = document.getElementById('badgeModalTitle');
+      const desc = document.getElementById('badgeModalDesc');
+      const rewards = document.getElementById('badgeModalRewards');
+      const nextBtn = document.getElementById('badgeModalNextBtn');
+
+      if (kicker) kicker.textContent = cur.kicker || '🏅 وسام جديد مفتوح!';
+      if (emoji) emoji.textContent = cur.emoji || '🏆';
+      if (title) title.textContent = cur.title || '';
+      if (desc) desc.textContent = cur.desc || '';
+      if (rewards) {
+        rewards.innerHTML = (cur.rewardChips || []).map(ch =>
+          `<span class="chip done" style="font-size:0.78rem; font-weight:900;">${ch}</span>`
+        ).join('');
+      }
+      if (nextBtn) {
+        nextBtn.textContent = window._badgePopupQueue.length > 0
+          ? `✨ التالي (${window._badgePopupQueue.length} متبقٍ)`
+          : '✨ رائع! متابعة';
+      }
+      ov.style.display = 'flex';
+      try { startJackpotConfetti(2200); playTaskCompleteCrunch(); } catch (e) {}
+    }
+
+    function closeBadgeUnlockModal() {
+      if (window._badgePopupQueue && window._badgePopupQueue.length > 0) {
+        showNextBadgeUnlockModal();
+      } else {
+        const ov = document.getElementById('badgeUnlockModalOverlay');
+        if (ov) ov.style.display = 'none';
+      }
+    }
+
+    function renderHabitsXpRankCard(rankInfo) {
+      const box = document.getElementById('habitsXpRankCardBox');
+      if (!box || !rankInfo) return;
+      const ach = ensureAchievementsState();
+      const totalBadges = BADGES_CATALOG.length;
+      const unlockedCount = BADGES_CATALOG.filter(b => !!ach.unlocked[b.id]).length;
+      box.innerHTML = `
+        <div class="xp-rank-hero-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="font-size:2.4rem; line-height:1;">${rankInfo.emoji}</div>
+              <div>
+                <div style="font-size:0.75rem; font-weight:800; color:var(--amber-ink);">${hbEsc(rankInfo.era)} • المستوى ${rankInfo.level}${rankInfo.isPrestige ? ' (Prestige)' : ' / 100+'}</div>
+                <h3 style="margin:2px 0 0; font-size:1.18rem; font-weight:900;">${hbEsc(rankInfo.title)}</h3>
+              </div>
+            </div>
+            <div style="text-align:end;">
+              <div style="font-size:1.05rem; font-weight:900; color:var(--accent-ink);">⚡ ${rankInfo.totalXp.toLocaleString()} XP</div>
+              <div class="hint" style="font-size:0.74rem;">متبقٍ للمستوى ${rankInfo.level + 1}: <strong>${rankInfo.remainingXp.toLocaleString()} XP</strong></div>
+            </div>
+          </div>
+          <div class="xp-progress-track">
+            <div class="xp-progress-fill" style="width:${rankInfo.pct}%;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; font-size:0.75rem;">
+            <span class="hint">التقدم داخل المستوى الحالي: <strong>${rankInfo.inLevelXp.toLocaleString()} / ${rankInfo.needForNextXp.toLocaleString()} XP (${rankInfo.pct}%)</strong></span>
+            <button type="button" class="btn btn-outline btn-sm" style="padding:2px 10px; font-size:0.72rem; font-weight:800;" onclick="openBadgesAndRanksPage()">🏅 الأوسمة (${unlockedCount}/${totalBadges})</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateHeaderRankPillUI(rankInfo) {
+      if (!rankInfo) return;
+      const pill = document.getElementById('headerRankPill');
+      if (pill) {
+        pill.innerHTML = `<span>${rankInfo.emoji}</span><span>Lv ${rankInfo.level} • ${hbEsc(rankInfo.title)}</span>`;
+      }
+      renderHabitsXpRankCard(rankInfo);
+    }
+
+    function evaluateBadgesAndXp(allowPopups = true) {
+      if (_isEvaluatingBadges) return null;
+      _isEvaluatingBadges = true;
+      try {
+        const ach = ensureAchievementsState();
+        const sysToday = getSystemTodayYMD();
+        let anyNew = false;
+        let metrics = computeUserLiveStatsForBadges();
+
+        // حلقة فحص (مرتين كحد أقصى لتغطية أوسمة الـ XP التي قد تُفتح فور إضافة XP وسام جديد)
+        for (let pass = 0; pass < 2; pass++) {
+          let unlockedThisPass = false;
+          BADGES_CATALOG.forEach(b => {
+            if (ach.unlocked[b.id]) return;
+            const curVal = Number(b.val(metrics)) || 0;
+            if (curVal >= b.target) {
+              const meta = BADGE_TIER_META[b.tier] || BADGE_TIER_META.bronze;
+              ach.unlocked[b.id] = { date: sysToday, tier: b.tier };
+              anyNew = true;
+              unlockedThisPass = true;
+
+              // إضافة عملات الذهب للمحفظة
+              if (!state.goldWallet) state.goldWallet = { coins: 0, carryMinutes: 0, rewardedTotalMinutes: 0, purchases: [] };
+              state.goldWallet.coins = (Number(state.goldWallet.coins) || 0) + meta.coins;
+
+              // رمية جاكبوت خاصة للأوسمة الذهبية والأسطورية فقط (بوزن 0.80 و4 نجوم ومحمية بالسقف وبمفتاح idempotent)
+              if (meta.jackpot) {
+                try { rollDopamineJackpot('badge_epic', 4, 'badge:' + b.id); } catch (e) {}
+              }
+
+              if (allowPopups) {
+                const chips = [`+${meta.coins} عملة ذهبية 🪙`, `+${meta.xp} XP ⚡`];
+                if (meta.jackpot) chips.push('🎰 رمية جاكبوت خاصة (4⭐)');
+                enqueueBadgeCelebrationPopup({
+                  kicker: `🏅 وسام جديد (${meta.label})`,
+                  emoji: b.emoji,
+                  title: b.title,
+                  desc: b.desc,
+                  rewardChips: chips
+                });
+              }
+            }
+          });
+          if (!unlockedThisPass) break;
+          metrics = computeUserLiveStatsForBadges();
+        }
+
+        // فحص ترقية المستوى واللقب (Rank-Up Pop-up)
+        const rInfo = metrics.rankInfo;
+        if (rInfo.level > ach.highestLevelAck) {
+          const levelsGained = rInfo.level - ach.highestLevelAck;
+          ach.highestLevelAck = rInfo.level;
+          anyNew = true;
+          const rankCoins = Math.min(50, Math.max(10, levelsGained * 10));
+          if (!state.goldWallet) state.goldWallet = { coins: 0, carryMinutes: 0, rewardedTotalMinutes: 0, purchases: [] };
+          state.goldWallet.coins = (Number(state.goldWallet.coins) || 0) + rankCoins;
+          if (allowPopups) {
+            enqueueBadgeCelebrationPopup({
+              kicker: `⬆️ ترقية مستوى جديدة — ${rInfo.era}`,
+              emoji: rInfo.emoji,
+              title: `المستوى ${rInfo.level}: ${rInfo.title}`,
+              desc: `مبارك يا صلاح! وصلت إلى ${rInfo.totalXp.toLocaleString()} XP وارتقيت إلى لقب «${rInfo.title}».`,
+              rewardChips: [`+${rankCoins} عملة ذهبية 🪙`, `المستوى ${rInfo.level}`]
+            });
+          }
+        }
+
+        if (anyNew) saveState();
+        updateHeaderRankPillUI(rInfo);
+        return metrics;
+      } finally {
+        _isEvaluatingBadges = false;
+      }
+    }
+
+    function setBadgesFilter(catId, statusKey) {
+      const ach = ensureAchievementsState();
+      if (catId !== null) ach.filterCat = catId;
+      if (statusKey !== null) ach.filterStatus = statusKey;
+      saveState();
+      renderBadgesAndRanksView();
+    }
+
+    function renderBadgesAndRanksView() {
+      const box = document.getElementById('statsBadgesAndRanksView');
+      if (!box) return;
+      const ach = ensureAchievementsState();
+      const m = computeUserLiveStatsForBadges();
+      const r = m.rankInfo;
+      const totalBadges = BADGES_CATALOG.length;
+      const unlockedCount = BADGES_CATALOG.filter(b => !!ach.unlocked[b.id]).length;
+      const overallPct = totalBadges > 0 ? Math.round((unlockedCount / totalBadges) * 100) : 0;
+
+      const curCat = ach.filterCat || 'all';
+      const curStatus = ach.filterStatus || 'all';
+
+      const filtered = BADGES_CATALOG.filter(b => {
+        if (curCat !== 'all' && b.cat !== curCat) return false;
+        const isUnl = !!ach.unlocked[b.id];
+        if (curStatus === 'unlocked' && !isUnl) return false;
+        if (curStatus === 'locked' && isUnl) return false;
+        return true;
+      });
+
+      box.innerHTML = `
+        <!-- ملخص الأوسمة المفتوحة -->
+        <div class="card" style="padding:14px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3 style="margin:0; font-size:1.06rem;">🏅 الأوسمة والتحديات (${unlockedCount} / ${totalBadges})</h3>
+            <p class="hint" style="margin:3px 0 0; font-size:0.78rem;">مؤشر الخبرة والمستوى يظهر أعلى طاقة الصمود (HP) في قسم المهام الدورية.</p>
+          </div>
+          <span class="chip done" style="font-size:0.8rem; font-weight:900;">الإنجاز الكلي: ${overallPct}%</span>
+        </div>
+
+        <!-- فلاتر المسارات والحالة -->
+        <div class="card" style="padding:12px 14px; margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+            <span style="font-weight:900; font-size:0.86rem;">🎯 تصفية الأوسمة والتحديات (${filtered.length}):</span>
+            <div style="display:flex; gap:5px;">
+              <button type="button" class="btn btn-sm ${curStatus === 'all' ? 'btn-primary' : 'btn-outline'}" style="padding:3px 10px; font-size:0.74rem;" onclick="setBadgesFilter(null, 'all')">الكل (${totalBadges})</button>
+              <button type="button" class="btn btn-sm ${curStatus === 'unlocked' ? 'btn-primary' : 'btn-outline'}" style="padding:3px 10px; font-size:0.74rem;" onclick="setBadgesFilter(null, 'unlocked')">✅ المفتوحة (${unlockedCount})</button>
+              <button type="button" class="btn btn-sm ${curStatus === 'locked' ? 'btn-primary' : 'btn-outline'}" style="padding:3px 10px; font-size:0.74rem;" onclick="setBadgesFilter(null, 'locked')">⏳ قيد التقدم (${totalBadges - unlockedCount})</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:5px;">
+            ${BADGE_CATEGORIES_META.map(c => `
+              <button type="button" class="cat-quick-chip ${curCat === c.id ? 'active' : ''}" style="font-size:0.73rem; padding:4px 10px;" onclick="setBadgesFilter('${c.id}', null)">${c.label}</button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- شبكة الأوسمة -->
+        <div class="badges-grid">
+          ${filtered.map(b => {
+            const unl = ach.unlocked[b.id];
+            const isUnl = !!unl;
+            const meta = BADGE_TIER_META[b.tier] || BADGE_TIER_META.bronze;
+            const curVal = Math.min(b.target, Math.max(0, Number(b.val(m)) || 0));
+            const pct = b.target > 0 ? Math.min(100, Math.round((curVal / b.target) * 100)) : 0;
+            return `
+              <div class="badge-card tier-${b.tier} ${isUnl ? 'unlocked' : 'locked'}">
+                <div style="display:flex; gap:10px; align-items:flex-start;">
+                  <div class="badge-icon-orb">${b.emoji}</div>
+                  <div style="flex:1; min-width:0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:4px; flex-wrap:wrap;">
+                      <span style="font-weight:900; font-size:0.88rem; color:var(--text);">${hbEsc(b.title)}</span>
+                      <span class="chip ${isUnl ? 'done' : ''}" style="font-size:0.66rem; padding:1px 6px;">${meta.label}</span>
+                    </div>
+                    <div class="hint" style="font-size:0.74rem; margin-top:3px; line-height:1.45;">${hbEsc(b.desc)}</div>
+                  </div>
+                </div>
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.71rem; margin-bottom:4px;">
+                    <span class="hint" style="font-weight:800;">${isUnl ? `✅ مفتوح (${unl.date || ''})` : `التقدم: ${curVal} / ${b.target} (${pct}%)`}</span>
+                    <span style="font-weight:800; color:var(--amber-ink);">+${meta.coins}🪙 • +${meta.xp}XP${meta.jackpot ? ' • 🎰' : ''}</span>
+                  </div>
+                  <div class="badge-mini-bar">
+                    <div class="badge-mini-fill" style="width:${isUnl ? 100 : pct}%;"></div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
   </script>
 
   <!-- قماش الاحتفال البصري (Fullscreen Confetti Cannon) -->
@@ -23282,6 +24818,353 @@ ${plan.leftoverSurplusMin >= 15 ? `
       </button>
     </div>
   </div>
+
+
+  <!-- ==================== نافذة احتفال فتح وسام / ترقية لقب (Pop-up Queue) ==================== -->
+  <div id="badgeUnlockModalOverlay" class="hb-modal-overlay" style="z-index:9750; display:none;" onclick="if(event.target===this) closeBadgeUnlockModal()">
+    <div class="hb-modal-box" role="dialog" aria-modal="true" style="max-width:440px; text-align:center; padding:24px 20px;">
+      <div id="badgeModalKicker" style="font-size:0.78rem; font-weight:900; color:var(--amber-ink); margin-bottom:6px;">🏅 وسام جديد مفتوح!</div>
+      <div id="badgeModalEmoji" style="font-size:3.6rem; line-height:1.15; margin-bottom:8px;">🏆</div>
+      <h3 id="badgeModalTitle" style="margin:0 0 6px; font-size:1.25rem; font-weight:900;">الشرارة الأولى</h3>
+      <p id="badgeModalDesc" class="hint" style="margin:0 0 12px; font-size:0.86rem; line-height:1.65;"></p>
+      <div id="badgeModalRewards" style="display:flex; justify-content:center; flex-wrap:wrap; gap:6px; margin-bottom:16px;"></div>
+      <button type="button" id="badgeModalNextBtn" class="btn btn-primary" style="width:100%; font-weight:900; padding:10px;" onclick="closeBadgeUnlockModal()">✨ رائع! متابعة</button>
+    </div>
+  </div>
+<!-- ==================== Firebase Real-Time Sync Engine ==================== -->
+<style>
+  #fbSyncFab {
+    position: fixed;
+    bottom: 14px;
+    left: 14px;
+    z-index: 9700;
+    background: var(--surface, #ffffff);
+    color: var(--text, #0c1122);
+    border: 1.5px solid var(--border, #e4e7f2);
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0.88;
+    transition: all 0.2s ease;
+  }
+  #fbSyncFab:hover { opacity: 1; transform: translateY(-2px); }
+  #fbSyncFab.connected { border-color: #10b981; color: #047857; }
+  #fbSyncFab.syncing { border-color: #f59e0b; color: #b45309; }
+  #fbSyncModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9800;
+    background: rgba(6, 9, 20, 0.75);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .fb-sync-box {
+    background: var(--surface, #ffffff);
+    color: var(--text, #0c1122);
+    border: 1.5px solid var(--border, #e4e7f2);
+    border-radius: 22px;
+    padding: 20px;
+    width: 100%;
+    max-width: 430px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    direction: rtl;
+    text-align: right;
+  }
+  .fb-sync-box input {
+    width: 100%;
+    padding: 10px 12px;
+    margin: 6px 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border, #e4e7f2);
+    background: var(--surface-2, #eff1f9);
+    color: inherit;
+    font-size: 0.88rem;
+  }
+  .fb-sync-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+</style>
+
+<button id="fbSyncFab" type="button" onclick="openFbSyncModal()">☁️ مزامنة</button>
+
+<div id="fbSyncModal" onclick="if(event.target===this) closeFbSyncModal()">
+  <div class="fb-sync-box">
+    <h3 style="margin-bottom:6px;">☁️ المزامنة اللحظية (Firebase)</h3>
+    <p id="fbSyncStatusText" style="font-size:0.82rem; color:var(--muted,#6a7392); margin-bottom:12px;">
+      أدخل رابط قاعدة البيانات وكلمة سر موحدة في التلفون والتابلت.
+    </p>
+    <label style="font-size:0.8rem; font-weight:700;">رابط Firebase Realtime Database:</label>
+    <input id="fbUrlInput" type="text" dir="ltr" placeholder="https://habitico-app-default-rtdb.asia-southeast1.firebasedatabase.app/" />
+    <label style="font-size:0.8rem; font-weight:700;">كلمة سر الغرفة السرية (نفسها في الجهازين):</label>
+    <input id="fbSecretInput" type="text" dir="ltr" placeholder="مثال: salah-habitico-2026" />
+    <div class="fb-sync-actions">
+      <button type="button" class="btn btn-primary" style="flex:1;" onclick="saveFbSyncConfig()">حفظ وتفعيل</button>
+      <button type="button" class="btn btn-outline" onclick="forcePushToFb()">⬆️ رفع الآن</button>
+      <button type="button" class="btn btn-outline" onclick="closeFbSyncModal()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const CFG_KEY = '__habitico_fb_cfg';
+  const origSetItem = localStorage.setItem.bind(localStorage);
+  const origRemoveItem = localStorage.removeItem.bind(localStorage);
+  const origClear = localStorage.clear.bind(localStorage);
+
+  let isApplyingRemote = false;
+  let pushTimer = null;
+  let eventSource = null;
+  let pendingReload = false;
+  let lastSyncedDigest = '';
+
+  function normalizeForDiff(dataObj) {
+    const out = {};
+    Object.keys(dataObj || {}).sort().forEach(k => {
+      const raw = dataObj[k];
+      if (k === 'habitico_production_v1' && typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            delete parsed.highestTimestamp;
+            out[k] = JSON.stringify(parsed);
+            return;
+          }
+        } catch (e) {}
+      }
+      out[k] = raw;
+    });
+    return JSON.stringify(out);
+  }
+
+  function getCfg() {
+    try {
+      const raw = localStorage.getItem(CFG_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return {
+      url: '',
+      secret: '',
+      deviceId: 'dev_' + Math.random().toString(36).slice(2, 10),
+      lastTs: 0
+    };
+  }
+
+  function saveCfg(cfg) {
+    origSetItem(CFG_KEY, JSON.stringify(cfg));
+  }
+
+  function getEndpoint(cfg) {
+    if (!cfg.url || !cfg.secret) return null;
+    const base = cfg.url.trim().replace(/\/+$/, '');
+    const room = encodeURIComponent(cfg.secret.trim());
+    return `${base}/habitico_rooms/${room}.json`;
+  }
+
+  function getAllAppData() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && !k.startsWith('__habitico_fb_')) {
+        data[k] = localStorage.getItem(k);
+      }
+    }
+    return data;
+  }
+
+  function setFabState(state, text) {
+    const fab = document.getElementById('fbSyncFab');
+    if (!fab) return;
+    fab.className = state || '';
+    fab.textContent = text;
+  }
+
+  async function pushToFirebase(forcePush) {
+    const cfg = getCfg();
+    const endpoint = getEndpoint(cfg);
+    if (!endpoint || isApplyingRemote) return;
+
+    const currentData = getAllAppData();
+    const currentDigest = normalizeForDiff(currentData);
+    if (!forcePush && lastSyncedDigest && currentDigest === lastSyncedDigest) {
+      return;
+    }
+
+    setFabState('syncing', '⏳ جاري الرفع...');
+    const now = Date.now();
+    const body = {
+      updatedAt: now,
+      deviceId: cfg.deviceId,
+      payload: currentData
+    };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        cfg.lastTs = now;
+        saveCfg(cfg);
+        lastSyncedDigest = currentDigest;
+        setFabState('connected', '🟢 متزامن');
+      } else {
+        setFabState('', '⚠️ خطأ مزامنة');
+      }
+    } catch (err) {
+      setFabState('', '📴 أوفلاين');
+    }
+  }
+
+  function schedulePush() {
+    if (isApplyingRemote) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushToFirebase, 900);
+  }
+
+  localStorage.setItem = function(k, v) {
+    origSetItem(k, v);
+    if (!k.startsWith('__habitico_fb_')) schedulePush();
+  };
+  localStorage.removeItem = function(k) {
+    origRemoveItem(k);
+    if (!k.startsWith('__habitico_fb_')) schedulePush();
+  };
+  localStorage.clear = function() {
+    const cfg = getCfg();
+    origClear();
+    saveCfg(cfg);
+    schedulePush();
+  };
+
+  function applyRemoteSnapshot(remote) {
+    const cfg = getCfg();
+    if (!remote || typeof remote !== 'object') return;
+    if (remote.deviceId === cfg.deviceId) return;
+    if (!remote.updatedAt || remote.updatedAt <= (cfg.lastTs || 0)) return;
+
+    const remotePayload = remote.payload || {};
+    const currentPayload = getAllAppData();
+    const remoteDigest = normalizeForDiff(remotePayload);
+    const currentDigest = normalizeForDiff(currentPayload);
+    if (remoteDigest === currentDigest) {
+      cfg.lastTs = remote.updatedAt;
+      saveCfg(cfg);
+      lastSyncedDigest = currentDigest;
+      return;
+    }
+
+    isApplyingRemote = true;
+    try {
+      Object.keys(currentPayload).forEach(k => {
+        if (!(k in remotePayload)) origRemoveItem(k);
+      });
+      Object.keys(remotePayload).forEach(k => {
+        origSetItem(k, remotePayload[k]);
+      });
+      cfg.lastTs = remote.updatedAt;
+      saveCfg(cfg);
+    } finally {
+      isApplyingRemote = false;
+    }
+
+    lastSyncedDigest = remoteDigest;
+    const active = document.activeElement;
+    const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+    if (isTyping) {
+      pendingReload = true;
+      setFabState('connected', '🔄 اضغط لتحديث الشاشة');
+    } else {
+      location.reload();
+    }
+  }
+
+  function startRealtimeStream() {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    const cfg = getCfg();
+    const endpoint = getEndpoint(cfg);
+    if (!endpoint) {
+      setFabState('', '☁️ ربط المزامنة');
+      return;
+    }
+
+    setFabState('syncing', '⏳ اتصال...');
+    eventSource = new EventSource(endpoint);
+
+    eventSource.addEventListener('put', function(e) {
+      try {
+        const msg = JSON.parse(e.data);
+        setFabState('connected', '🟢 متزامن');
+        if (msg.path === '/') {
+          if (msg.data === null && Object.keys(getAllAppData()).length > 0) {
+            pushToFirebase();
+          } else if (msg.data) {
+            applyRemoteSnapshot(msg.data);
+          }
+        }
+      } catch (err) {}
+    });
+
+    eventSource.onerror = function() {
+      setFabState('', '📴 إعادة اتصال...');
+    };
+  }
+
+  window.openFbSyncModal = function() {
+    if (pendingReload) {
+      location.reload();
+      return;
+    }
+    const cfg = getCfg();
+    document.getElementById('fbUrlInput').value = cfg.url || '';
+    document.getElementById('fbSecretInput').value = cfg.secret || '';
+    document.getElementById('fbSyncModal').style.display = 'flex';
+  };
+
+  window.closeFbSyncModal = function() {
+    document.getElementById('fbSyncModal').style.display = 'none';
+  };
+
+  window.saveFbSyncConfig = function() {
+    const cfg = getCfg();
+    cfg.url = document.getElementById('fbUrlInput').value.trim();
+    cfg.secret = document.getElementById('fbSecretInput').value.trim();
+    cfg.lastTs = 0;
+    saveCfg(cfg);
+    closeFbSyncModal();
+    startRealtimeStream();
+  };
+
+  window.forcePushToFb = function() {
+    closeFbSyncModal();
+    pushToFirebase(true);
+  };
+
+  window.addEventListener('online', () => {
+    pushToFirebase();
+    startRealtimeStream();
+  });
+
+  lastSyncedDigest = normalizeForDiff(getAllAppData());
+  startRealtimeStream();
+})();
+</script>
 
 </body>
 </html>
