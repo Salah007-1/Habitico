@@ -24958,12 +24958,13 @@ ${plan.leftoverSurplusMin >= 15 ? `
       url: '',
       secret: '',
       deviceId: 'dev_' + Math.random().toString(36).slice(2, 10),
-      lastTs: 0
+      lastTs: 0,
+      dirty: false
     };
   }
 
   function saveCfg(cfg) {
-    origSetItem(CFG_KEY, JSON.stringify(cfg));
+    try { origSetItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
   }
 
   function getEndpoint(cfg) {
@@ -24976,12 +24977,14 @@ ${plan.leftoverSurplusMin >= 15 ? `
 
   function getAllAppData() {
     const data = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && !k.startsWith('__habitico_fb_')) {
-        data[k] = localStorage.getItem(k);
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && !k.startsWith('__habitico_fb_')) {
+          data[k] = localStorage.getItem(k);
+        }
       }
-    }
+    } catch (e) {}
     return data;
   }
 
@@ -24999,7 +25002,14 @@ ${plan.leftoverSurplusMin >= 15 ? `
 
     const currentData = getAllAppData();
     const currentDigest = normalizeForDiff(currentData);
-    if (!forcePush && lastSyncedDigest && currentDigest === lastSyncedDigest) {
+    if (!forcePush && !cfg.dirty && lastSyncedDigest && currentDigest === lastSyncedDigest) {
+      return;
+    }
+
+    if (!navigator.onLine) {
+      cfg.dirty = true;
+      saveCfg(cfg);
+      setFabState('', '📴 أوفلاين (حفظ محلي)');
       return;
     }
 
@@ -25019,19 +25029,35 @@ ${plan.leftoverSurplusMin >= 15 ? `
       });
       if (res.ok) {
         cfg.lastTs = now;
+        cfg.dirty = false;
         saveCfg(cfg);
         lastSyncedDigest = currentDigest;
         setFabState('connected', '🟢 متزامن');
       } else {
+        cfg.dirty = true;
+        saveCfg(cfg);
         setFabState('', `⚠️ خطأ ${res.status}`);
       }
     } catch (err) {
-      setFabState('', '📴 أوفلاين');
+      cfg.dirty = true;
+      saveCfg(cfg);
+      setFabState('', '📴 أوفلاين (حفظ محلي)');
     }
   }
 
   function schedulePush() {
     if (isApplyingRemote) return;
+    const currentDigest = normalizeForDiff(getAllAppData());
+    if (lastSyncedDigest && currentDigest === lastSyncedDigest) return;
+    const cfg = getCfg();
+    if (getEndpoint(cfg)) {
+      cfg.dirty = true;
+      saveCfg(cfg);
+    }
+    if (!navigator.onLine) {
+      if (getEndpoint(cfg)) setFabState('', '📴 أوفلاين (حفظ محلي)');
+      return;
+    }
     clearTimeout(pushTimer);
     pushTimer = setTimeout(pushToFirebase, 900);
   }
@@ -25073,6 +25099,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
     const currentDigest = normalizeForDiff(currentPayload);
     if (remoteDigest === currentDigest) {
       cfg.lastTs = remote.updatedAt;
+      cfg.dirty = false;
       saveCfg(cfg);
       lastSyncedDigest = currentDigest;
       return;
@@ -25087,6 +25114,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
         origSetItem(k, remotePayload[k]);
       });
       cfg.lastTs = remote.updatedAt;
+      cfg.dirty = false;
       saveCfg(cfg);
     } finally {
       isApplyingRemote = false;
@@ -25115,6 +25143,15 @@ ${plan.leftoverSurplusMin >= 15 ? `
       return;
     }
 
+    if (!navigator.onLine) {
+      setFabState('', '📴 أوفلاين (حفظ محلي)');
+      return;
+    }
+
+    if (cfg.dirty) {
+      pushToFirebase(true);
+    }
+
     setFabState('syncing', '⏳ اتصال...');
     eventSource = new EventSource(endpoint);
 
@@ -25133,7 +25170,15 @@ ${plan.leftoverSurplusMin >= 15 ? `
     });
 
     eventSource.onerror = function() {
-      setFabState('', '📴 إعادة اتصال...');
+      if (!navigator.onLine) {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        setFabState('', '📴 أوفلاين (حفظ محلي)');
+      } else {
+        setFabState('', '📴 إعادة اتصال...');
+      }
     };
   }
 
@@ -25167,10 +25212,33 @@ ${plan.leftoverSurplusMin >= 15 ? `
     pushToFirebase(true);
   };
 
+  window.addEventListener('offline', () => {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    const cfg = getCfg();
+    if (getEndpoint(cfg)) {
+      setFabState('', '📴 أوفلاين (حفظ محلي)');
+    }
+  });
+
   window.addEventListener('online', () => {
-    pushToFirebase();
+    const cfg = getCfg();
+    if (cfg.dirty) {
+      pushToFirebase(true);
+    } else {
+      pushToFirebase();
+    }
     startRealtimeStream();
   });
+
+  // Register Service Worker for full offline PWA support when hosted over HTTP/HTTPS
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
 
   lastSyncedDigest = normalizeForDiff(getAllAppData());
   startRealtimeStream();
