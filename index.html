@@ -7942,12 +7942,18 @@ textarea:focus {
           habitTargetLocked: false,
           specialRuleViolated: false,
           violatedSpecialRuleNames: [],
-          penaltyEvaluated: false
+          penaltyEvaluated: false,
+          freeDeferUsedCount: 0,
+          freeDeferUsedWeight: 0,
+          penalizedDefers: []
         };
       } else {
         const wk = state.weeklyData[sundayYMD];
         if (typeof wk.habitTargetPct !== 'number') wk.habitTargetPct = 60;
         if (typeof wk.habitTargetLocked !== 'boolean') wk.habitTargetLocked = false;
+        if (typeof wk.freeDeferUsedCount !== 'number') wk.freeDeferUsedCount = 0;
+        if (typeof wk.freeDeferUsedWeight !== 'number') wk.freeDeferUsedWeight = 0;
+        if (!Array.isArray(wk.penalizedDefers)) wk.penalizedDefers = [];
         if (typeof wk.specialRuleViolated !== 'boolean') wk.specialRuleViolated = false;
         if (!Array.isArray(wk.violatedSpecialRuleNames)) wk.violatedSpecialRuleNames = [];
         if (typeof wk.penaltyEvaluated !== 'boolean') wk.penaltyEvaluated = false;
@@ -10135,19 +10141,75 @@ textarea:focus {
       const tasks = (state.studyTasks || []).filter(t => t && t.weekSunday === weekSunday && !(['st_1', 'st_2', 'st_3', 'st_4'].includes(t.id) && !t.done));
       const total = tasks.length;
       const done = tasks.filter(t => t.done).length;
-      if (total === 0) {
-        return { total: 0, done: 0, hasTasks: false, pct: null, isMet: true };
+
+      // تضمين الحصص الأسبوعية الثابتة بدقة (بوزن نجومها وبحد أقصى 100% لكل حصة) مع حماية الأسابيع القديمة قبل تاريخ البداية
+      const sysToday = getSystemTodayYMD();
+      const currentSun = getWeekSundayYMD(sysToday);
+      const startSun = state.startDate ? getWeekSundayYMD(state.startDate) : null;
+      const isBeforeStart = !!(startSun && diffDays(weekSunday, startSun) > 0);
+      const isPastWeek = diffDays(weekSunday, currentSun) > 0;
+      const quotas = (typeof ensureWeeklyFixedQuotas === 'function' && !isBeforeStart) ? (ensureWeeklyFixedQuotas() || []) : [];
+
+      let quotasWeight = 0;
+      let quotasEarned = 0;
+      let quotasTotal = 0;
+      let quotasDone = 0;
+      let hasAnyQuotaLog = false;
+
+      if (quotas.length > 0) {
+        const quotaEntries = quotas.map(q => {
+          const targetMin = (typeof getWeeklyQuotaNetTargetMinutes === 'function') ? getWeeklyQuotaNetTargetMinutes(q) : 0;
+          const doneMin = (typeof getWeeklyQuotaLoggedMinutes === 'function') ? getWeeklyQuotaLoggedMinutes(q, weekSunday) : 0;
+          if (doneMin > 0) hasAnyQuotaLog = true;
+          const weight = getTaskDifficultyWeight({ stars: q && q.stars });
+          const frac = targetMin > 0 ? Math.min(1, doneMin / targetMin) : 0;
+          return { targetMin, doneMin, weight, frac };
+        }).filter(e => e.targetMin > 0);
+
+        // للأسابيع الماضية المنتهية بلا أي مهام ولا أي تسجيل حصص لا نطبق عقوبة بأثر رجعي
+        const includeQuotasForWeek = !isPastWeek || total > 0 || hasAnyQuotaLog;
+        if (includeQuotasForWeek && quotaEntries.length > 0) {
+          quotasTotal = quotaEntries.length;
+          quotaEntries.forEach(e => {
+            quotasWeight += e.weight;
+            quotasEarned += e.weight * e.frac;
+            if (e.doneMin >= e.targetMin) quotasDone++;
+          });
+        }
       }
-      const totalWeight = tasks.reduce((acc, t) => acc + getTaskDifficultyWeight(t), 0) || 1;
-      const earnedWeight = tasks.reduce((acc, t) => acc + (getTaskDifficultyWeight(t) * taskCompletionFraction(t)), 0);
+
+      const wk = (state.weeklyData && state.weeklyData[weekSunday]) ? state.weeklyData[weekSunday] : null;
+      const penalizedDefers = (wk && Array.isArray(wk.penalizedDefers)) ? wk.penalizedDefers : [];
+      const penalizedDeferWeight = penalizedDefers.reduce((acc, d) => acc + Math.max(0, Number(d && d.weight) || 0), 0);
+      const penalizedDefersCount = penalizedDefers.length;
+
+      const totalItems = total + quotasTotal + penalizedDefersCount;
+      if (totalItems === 0) {
+        return {
+          total: 0, done: 0, quotasTotal: 0, quotasDone: 0, quotasPct: 0,
+          penalizedDefersCount: 0, penalizedDeferWeight: 0, totalItems: 0,
+          hasTasks: false, pct: null, isMet: true, totalWeight: 0, earnedWeight: 0
+        };
+      }
+
+      const tasksWeight = tasks.reduce((acc, t) => acc + getTaskDifficultyWeight(t), 0);
+      const tasksEarned = tasks.reduce((acc, t) => acc + (getTaskDifficultyWeight(t) * taskCompletionFraction(t)), 0);
+      const totalWeight = (tasksWeight + quotasWeight + penalizedDeferWeight) || 1;
+      const earnedWeight = tasksEarned + quotasEarned;
       const pct = Math.round((earnedWeight / totalWeight) * 100);
-      return { total, done, hasTasks: true, pct, isMet: pct >= 80, totalWeight, earnedWeight };
+      const quotasPct = quotasWeight > 0 ? Math.round((quotasEarned / quotasWeight) * 100) : 0;
+
+      return {
+        total, done, quotasTotal, quotasDone, quotasPct,
+        penalizedDefersCount, penalizedDeferWeight, totalItems,
+        hasTasks: true, pct, isMet: pct >= 80, totalWeight, earnedWeight
+      };
     }
 
     function taskWeekSharePct(t, nodeWeight = 1.0) {
       if (!t) return 0;
-      const weekTasks = (state.studyTasks || []).filter(x => x && x.weekSunday === t.weekSunday && !(['st_1', 'st_2', 'st_3', 'st_4'].includes(x.id) && !x.done));
-      const totalWeight = weekTasks.reduce((acc, x) => acc + getTaskDifficultyWeight(x), 0) || 1;
+      const prog = calculateWeeklyTasksProgress(t.weekSunday);
+      const totalWeight = (prog && prog.totalWeight > 0) ? prog.totalWeight : 1;
       const taskWeight = getTaskDifficultyWeight(t);
       const v = (100 * (taskWeight / totalWeight)) * nodeWeight;
       return Math.round(v * 100) / 100;
@@ -11131,18 +11193,33 @@ textarea:focus {
       try { renderAdvisorStudioPage(); } catch (e) { console.error(e); }
       const prog = calculateWeeklyTasksProgress(targetSun);
 
-      if (!prog.hasTasks || prog.total === 0) {
+      const wkForHint = ensureWeekData(targetSun);
+      const sysTodayForHint = getSystemTodayYMD();
+      const curSunForHint = getWeekSundayYMD(sysTodayForHint);
+      const dowForHint = parseYMD(sysTodayForHint).getDay();
+      const deferStatusText = (targetSun !== curSunForHint || dowForHint <= 1)
+        ? 'الترحيل حر الآن (فترة التخطيط: الأحد/الإثنين).'
+        : ((wkForHint.freeDeferUsedCount || 0) < 1
+          ? 'كرت طوارئ الترحيل: متاح (1 مهمة بحد أقصى 15% من وزن الأسبوع).'
+          : 'كرت طوارئ الترحيل: مُستخدم — أي ترحيل إضافي يظل محسوباً ضمن الـ 80%.');
+
+      if (!prog.hasTasks || prog.totalItems === 0) {
         if (progressContainer) progressContainer.style.display = 'none';
         if (ruleHint) {
-          ruleHint.textContent = `لا توجد مهام مضافة ${isNext ? 'للأسبوع القادم' : 'لهذا الأسبوع'} — لا توجد نسبة 80% مطلوبة ولا تترتب عقوبة صيام ما لم تضف مهام للأسبوع.`;
+          ruleHint.textContent = `لا توجد مهام أو حصص ثابتة ${isNext ? 'للأسبوع القادم' : 'لهذا الأسبوع'} — لا توجد نسبة 80% مطلوبة.`;
         }
       } else {
         if (progressContainer) progressContainer.style.display = 'block';
         if (progressBar) progressBar.style.width = `${prog.pct}%`;
-        if (progressTitle) progressTitle.textContent = `📋 إنجاز المهام: ${prog.pct}% (الهدف الأدنى ≥ 80%)`;
-        if (progressLabel) progressLabel.textContent = `${prog.done} / ${prog.total} منجزة (${prog.pct}%)`;
+        if (progressTitle) progressTitle.textContent = `📋 إنجاز الأسبوع (المهام + الحصص الثابتة): ${prog.pct}% (الهدف ≥ 80%)`;
+        if (progressLabel) {
+          const parts = [`مهام: ${prog.done}/${prog.total}`];
+          if (prog.quotasTotal > 0) parts.push(`حصص ثابتة: ${prog.quotasDone}/${prog.quotasTotal} (${prog.quotasPct}%)`);
+          if (prog.penalizedDefersCount > 0) parts.push(`مُرحَّل محسوب: ${prog.penalizedDefersCount}`);
+          progressLabel.textContent = parts.join(' | ');
+        }
         if (ruleHint) {
-          ruleHint.textContent = 'إنجاز 80% على الأقل من مهام الأسبوع المضافة بحلول نهاية السبت، وإلا تترتب عليك عقوبة الصيام!';
+          ruleHint.textContent = `شرط الصيام: إنجاز 80% على الأقل من المهام والحصص الأسبوعية الثابتة بحلول نهاية السبت. ${deferStatusText}`;
         }
       }
 
@@ -11269,7 +11346,7 @@ textarea:focus {
                     <button type="button" class="btn btn-sm ${t.done ? 'btn-outline' : 'btn-success'}" onclick="toggleStudyTask('${t.id}')">
                       ${t.done ? '✓ أُنجزت' : (hasSt ? 'إتمام الكل' : 'إتمام')}
                     </button>
-                    ${!t.done && !isNext ? `<button type="button" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:0.73rem; border-color:rgba(245,158,11,0.5); color:var(--amber-ink);" onclick="deferStudyTaskToNextWeek('${t.id}')" title="ترحيل المهمة للأسبوع القادم بلا تأنيب ضمير (إعادة التوازن)">⏭️ ترحيل</button>` : ''}
+                    ${!t.done && !isNext ? `<button type="button" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:0.73rem; border-color:rgba(245,158,11,0.5); color:var(--amber-ink);" onclick="deferStudyTaskToNextWeek('${t.id}')" title="ترحيل المهمة للأسبوع القادم (حر الأحد/الإثنين، وكرت طوارئ 15% من الثلاثاء للسبت)">⏭️ ترحيل</button>` : ''}
                     <button type="button" class="icon-btn edit-btn" onclick="editStudyTask('${t.id}')" title="تعديل المهمة وخطواتها وتفرعاتها">✎</button>
                     <button type="button" class="icon-btn" onclick="deleteStudyTask('${t.id}')" title="حذف المهمة">✕</button>
                   </div>
@@ -12581,7 +12658,7 @@ textarea:focus {
         if (!p) return;
         const tp = calculateWeeklyTasksProgress(p.sourceWeekSunday);
         // إذا لم تكن هناك أي مهام مضافة في ذلك الأسبوع (أو تم إنجاز ≥ 80% منها)، نلغي سبب عقوبة مهام الأسبوع فوراً
-        if (!tp.hasTasks || tp.total === 0 || tp.isMet) {
+        if (!tp.hasTasks || tp.totalItems === 0 || tp.isMet) {
           const parts = String(p.reason || '').split(' + ').map(s => s.trim()).filter(Boolean);
           const filteredParts = parts.filter(part => !part.includes('مهام الأسبوع الدراسية') && !part.includes('80% على الأقل من مهام الأسبوع'));
           if (filteredParts.length !== parts.length) {
@@ -12648,9 +12725,9 @@ textarea:focus {
           if ((wk.hasWeeklyGoal || wk.habitTargetLocked) && hc.totalAvailableSquares > 0 && hc.actualPct < wk.habitTargetPct) {
             reasons.push(`النزول عن نسبة الالتزام الأسبوعية للعادات (${hc.actualPct}% أقل من ${wk.habitTargetPct}%)`);
           }
-          // الشرط 4: عدم إنجاز 80% على الأقل من مهام الأسبوع (ينطبق فقط إذا كان المستخدم قد أضاف مهام لذلك الأسبوع فعلاً)
-          if (taskProg.hasTasks && taskProg.total > 0 && taskProg.pct !== null && taskProg.pct < 80) {
-            reasons.push(`عدم إنجاز 80% على الأقل من مهام الأسبوع الدراسية المخططة (أُنجز ${taskProg.pct}%)`);
+          // الشرط 4: عدم إنجاز 80% على الأقل من مهام الأسبوع والحصص الأسبوعية الثابتة
+          if (taskProg.hasTasks && taskProg.totalItems > 0 && taskProg.pct !== null && taskProg.pct < 80) {
+            reasons.push(`عدم إنجاز 80% على الأقل من مهام الأسبوع والحصص الثابتة (أُنجز ${taskProg.pct}%)`);
           }
 
           if (reasons.length > 0) {
@@ -21967,12 +22044,79 @@ textarea:focus {
 
     function deferStudyTaskToNextWeek(taskId) {
       const t = (state.studyTasks || []).find(x => x.id === taskId);
-      if (!t) return;
-      const nextSun = addDays(t.weekSunday || getWeekSundayYMD(getSystemTodayYMD()), 7);
-      t.weekSunday = nextSun;
-      saveState();
-      renderAll();
-      showAppToast(`⏭️ تم ترحيل «${t.title}» إلى الأسبوع القادم (${nextSun}) بلا تأنيب ضمير!`);
+      if (!t || t.done) return;
+
+      const sysToday = getSystemTodayYMD();
+      const currentSun = getWeekSundayYMD(sysToday);
+      const sourceSun = t.weekSunday || currentSun;
+      const nextSun = addDays(sourceSun, 7);
+      const dow = parseYMD(sysToday).getDay(); // 0=الأحد, 1=الإثنين, 2..6=الثلاثاء..السبت
+
+      // 1) فترة التخطيط المرنة (الأحد والإثنين) أو ترحيل من أسبوع مستقبلي: ترحيل حر بلا أثر على الـ 80%
+      if (sourceSun !== currentSun || dow <= 1) {
+        t.weekSunday = nextSun;
+        saveState();
+        renderAll();
+        showAppToast(`⏭️ تم ترحيل «${t.title}» إلى الأسبوع القادم (${nextSun}) ضمن فترة التخطيط المرنة.`);
+        return;
+      }
+
+      // 2) فترة الالتزام (الثلاثاء ← السبت): كرت طوارئ واحد (مهمة واحدة بحد أقصى 15% من وزن الأسبوع) والباقي يُحسب ضدك
+      const wk = ensureWeekData(sourceSun);
+      const prog = calculateWeeklyTasksProgress(sourceSun);
+      const weekTotalWeight = Math.max(1, prog.totalWeight || 1);
+      const taskWeight = getTaskDifficultyWeight(t);
+      const taskSharePct = Math.round((taskWeight / weekTotalWeight) * 100);
+      const maxFreeWeight = weekTotalWeight * 0.15;
+      const hasEmergencyCard = (wk.freeDeferUsedCount || 0) < 1;
+
+      if (hasEmergencyCard) {
+        const isFullyCovered = taskWeight <= (maxFreeWeight + 0.001);
+        const excusedWeight = isFullyCovered ? taskWeight : Math.round(maxFreeWeight * 100) / 100;
+        const penalizedWeight = isFullyCovered ? 0 : Math.round((taskWeight - excusedWeight) * 100) / 100;
+        const msg = isFullyCovered
+          ? `🆘 ستستخدم «كرت الطوارئ الأسبوعي (1/1)» لترحيل «${t.title}» (${taskSharePct}% من وزن الأسبوع) إلى الأسبوع القادم (${nextSun}). سيُعفى وزنها بالكامل من شرط الـ 80%، وأي ترحيل آخر هذا الأسبوع سيظل محسوباً عليك.`
+          : `🆘 ستستخدم «كرت الطوارئ الأسبوعي (1/1)» لترحيل «${t.title}» (${taskSharePct}% من وزن الأسبوع) إلى الأسبوع القادم (${nextSun}). بما أنها تتجاوز سقف الإعفاء (15%)، سيُعفى منها 15% فقط ويظل الفائض (${Math.max(1, taskSharePct - 15)}%) محسوباً عليك في شرط الـ 80%.`;
+
+        openAppConfirmDialog('🆘 ترحيل بكرت الطوارئ الأسبوعي', msg, function() {
+          wk.freeDeferUsedCount = (wk.freeDeferUsedCount || 0) + 1;
+          wk.freeDeferUsedWeight = Math.round(((wk.freeDeferUsedWeight || 0) + excusedWeight) * 100) / 100;
+          if (penalizedWeight > 0) {
+            wk.penalizedDefers.push({
+              id: 'pdef_' + t.id + '_' + Date.now(),
+              taskId: t.id,
+              title: t.title,
+              weight: penalizedWeight,
+              stars: t.stars || 3,
+              deferredAt: Date.now()
+            });
+          }
+          t.weekSunday = nextSun;
+          saveState();
+          renderAll();
+          showAppToast(isFullyCovered
+            ? `🆘 تم استخدام كرت الطوارئ وترحيل «${t.title}» للأسبوع القادم مع إعفائها من الـ 80%.`
+            : `🆘 تم ترحيل «${t.title}» بكرت الطوارئ (إعفاء 15% وإبقاء الفائض محسوباً في الـ 80%).`);
+        }, false);
+        return;
+      }
+
+      // استُخدم كرت الطوارئ بالفعل -> الترحيل ينقل المهمة للأسبوع القادم لكن يبقي وزنها محسوباً كـ غير منجزة في الأسبوع الحالي
+      const warnMsg = `⚠️ لقد استُخدم كرت الطوارئ لهذا الأسبوع بالفعل! يمكنك ترحيل «${t.title}» (${taskSharePct}% من وزن الأسبوع) لتنظيم جدول الأسبوع القادم (${nextSun})، لكن وزنها سيظل محسوباً عليك كـ «غير منجزة» في مؤشر الـ 80% وعقوبة الصيام لهذا الأسبوع.`;
+      openAppConfirmDialog('⏭️ ترحيل مع بقاء الوزن محسوباً', warnMsg, function() {
+        wk.penalizedDefers.push({
+          id: 'pdef_' + t.id + '_' + Date.now(),
+          taskId: t.id,
+          title: t.title,
+          weight: taskWeight,
+          stars: t.stars || 3,
+          deferredAt: Date.now()
+        });
+        t.weekSunday = nextSun;
+        saveState();
+        renderAll();
+        showAppToast(`⏭️ تم ترحيل «${t.title}» للأسبوع القادم — مع بقاء وزنها محسوباً ضمن الـ 80% لهذا الأسبوع.`);
+      }, false);
     }
 
     function renderWeeklyPlanningWidgets(targetSun) {
