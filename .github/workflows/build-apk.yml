@@ -43,7 +43,6 @@ jobs:
           now_utc = datetime.now(timezone.utc)
           version = f"{now_utc.strftime('%Y%m%d')}-{h}"
 
-          # Embed builtin metadata inside bundle too
           meta = {
               "version": version,
               "hash": h,
@@ -84,7 +83,6 @@ jobs:
 
   build-android-apk:
     runs-on: ubuntu-latest
-    # Build APK automatically when native files change OR on manual trigger (saves Actions minutes on HTML-only pushes!)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -180,17 +178,92 @@ jobs:
           print('Manifest updated successfully')
           PY
 
-      - name: Apply Habitico App Icon from icon.png
+      - name: Apply Properly Scaled Adaptive Fox Icon & White Vector Notification Icon
         if: steps.check_native.outputs.rebuild == 'true'
         run: |
-          if [ -f icon.png ]; then
-            for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
-              mkdir -p "android/app/src/main/res/$dir"
-              cp icon.png "android/app/src/main/res/$dir/ic_launcher.png"
-              cp icon.png "android/app/src/main/res/$dir/ic_launcher_round.png"
-              cp icon.png "android/app/src/main/res/$dir/ic_launcher_foreground.png"
-            done
-          fi
+          python3 -c "import PIL" 2>/dev/null || pip install --quiet pillow
+          python3 - << 'PY'
+          import os
+          from PIL import Image
+
+          res_root = 'android/app/src/main/res'
+
+          # 1) Generate properly padded Android Adaptive Icon (no zoom/crop!) from icon.png
+          if os.path.isfile('icon.png'):
+              src = Image.open('icon.png').convert('RGBA')
+              # Sample corner pixel for seamless full-bleed background color
+              px = src.getpixel((4, 4))
+              bg_hex = '#{:02X}{:02X}{:02X}'.format(px[0], px[1], px[2])
+
+              # Write ic_launcher_background.xml matching icon.png background
+              values_dir = os.path.join(res_root, 'values')
+              os.makedirs(values_dir, exist_ok=True)
+              with open(os.path.join(values_dir, 'ic_launcher_background.xml'), 'w', encoding='utf-8') as f:
+                  f.write(f'''<?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="ic_launcher_background">{bg_hex}</color>
+          </resources>
+          ''')
+
+              # Write adaptive icon XMLs pointing to background color + padded foreground
+              anydpi_dir = os.path.join(res_root, 'mipmap-anydpi-v26')
+              os.makedirs(anydpi_dir, exist_ok=True)
+              adaptive_xml = '''<?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background"/>
+              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+          </adaptive-icon>
+          '''
+              for name in ('ic_launcher.xml', 'ic_launcher_round.xml'):
+                  with open(os.path.join(anydpi_dir, name), 'w', encoding='utf-8') as f:
+                      f.write(adaptive_xml)
+
+              # Density map: (dir, legacy_size, adaptive_fg_108dp_size)
+              densities = [
+                  ('mipmap-mdpi', 48, 108),
+                  ('mipmap-hdpi', 72, 162),
+                  ('mipmap-xhdpi', 96, 216),
+                  ('mipmap-xxhdpi', 144, 324),
+                  ('mipmap-xxxhdpi', 192, 432),
+              ]
+              for dname, leg_sz, fg_sz in densities:
+                  ddir = os.path.join(res_root, dname)
+                  os.makedirs(ddir, exist_ok=True)
+
+                  # Legacy icons (full size)
+                  leg_img = src.resize((leg_sz, leg_sz), Image.LANCZOS)
+                  leg_img.save(os.path.join(ddir, 'ic_launcher.png'))
+                  leg_img.save(os.path.join(ddir, 'ic_launcher_round.png'))
+
+                  # Adaptive foreground: place icon cleanly inside the 66-68% safe zone of 108dp canvas
+                  fg_canvas = Image.new('RGBA', (fg_sz, fg_sz), (px[0], px[1], px[2], 255))
+                  inner_sz = int(round(fg_sz * 0.68))
+                  inner_img = src.resize((inner_sz, inner_sz), Image.LANCZOS)
+                  offset = (fg_sz - inner_sz) // 2
+                  fg_canvas.paste(inner_img, (offset, offset), inner_img)
+                  fg_canvas.save(os.path.join(ddir, 'ic_launcher_foreground.png'))
+
+              print(f'Adaptive launcher icons generated cleanly (bg={bg_hex}, 68% safe-zone).')
+
+          # 2) Generate crisp white monochrome Fox vector status-bar notification icon (ic_stat_habitico.xml)
+          drawable_dir = os.path.join(res_root, 'drawable')
+          os.makedirs(drawable_dir, exist_ok=True)
+          fox_vector_xml = '''<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M4.2,2.5 L9.3,7.1 C10.1,6.8 11.0,6.6 12,6.6 C13.0,6.6 13.9,6.8 14.7,7.1 L19.8,2.5 C20.3,2.1 21.1,2.4 21.1,3.1 L20.6,11.6 C20.5,13.6 19.4,15.5 17.7,16.7 L12.6,20.8 C12.2,21.1 11.8,21.1 11.4,20.8 L6.3,16.7 C4.6,15.5 3.5,13.6 3.4,11.6 L2.9,3.1 C2.9,2.4 3.7,2.1 4.2,2.5 Z M8.5,12.2 A1.2,1.2 0 1,0 8.5,14.6 A1.2,1.2 0 1,0 8.5,12.2 Z M15.5,12.2 A1.2,1.2 0 1,0 15.5,14.6 A1.2,1.2 0 1,0 15.5,12.2 Z M12,17.8 L10.7,16.2 L13.3,16.2 Z"
+                  android:fillType="evenOdd" />
+          </vector>
+          '''
+          with open(os.path.join(drawable_dir, 'ic_stat_habitico.xml'), 'w', encoding='utf-8') as f:
+              f.write(fox_vector_xml)
+          print('White vector fox notification icon (ic_stat_habitico.xml) created cleanly.')
+          PY
 
       - name: Build Android APK
         if: steps.check_native.outputs.rebuild == 'true'
