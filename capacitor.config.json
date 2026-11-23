@@ -1,0 +1,14 @@
+{
+  "appId": "com.salah.habitico",
+  "appName": "Habitico",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#5b5bf0",
+      "sound": "default"
+    }
+  }
+}

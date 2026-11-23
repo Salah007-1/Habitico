@@ -25377,8 +25377,9 @@ ${plan.leftoverSurplusMin >= 15 ? `
     startRealtimeStream();
   });
 
-  // Register Service Worker for full offline PWA support when hosted over HTTP/HTTPS
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  // Register Service Worker for full offline PWA support (skip inside native Capacitor APK)
+  const isCapNative = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  if (!isCapNative && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     });
@@ -25386,6 +25387,634 @@ ${plan.leftoverSurplusMin >= 15 ? `
 
   lastSyncedDigest = normalizeForDiff(getAllAppData());
   startRealtimeStream();
+})();
+</script>
+
+
+<!-- ==================== Habitico Native & Web Notifications Engine (Capacitor + PWA) ==================== -->
+<style>
+  #hbNotifFab {
+    position: fixed;
+    bottom: 54px;
+    left: 14px;
+    z-index: 9700;
+    background: var(--surface, #ffffff);
+    color: var(--text, #0c1122);
+    border: 1.5px solid var(--border, #e4e7f2);
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0.9;
+    transition: all 0.2s ease;
+  }
+  #hbNotifFab:hover { opacity: 1; transform: translateY(-2px); }
+  #hbNotifFab.active { border-color: #5b5bf0; color: #4338ca; }
+  #hbNotifModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9810;
+    background: rgba(6, 9, 20, 0.75);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .hb-notif-box {
+    background: var(--surface, #ffffff);
+    color: var(--text, #0c1122);
+    border: 1.5px solid var(--border, #e4e7f2);
+    border-radius: 22px;
+    padding: 20px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    direction: rtl;
+    text-align: right;
+  }
+  .hb-notif-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 12px;
+    background: var(--surface-2, #eff1f9);
+    margin-bottom: 8px;
+    font-size: 0.84rem;
+    font-weight: 700;
+  }
+  .hb-notif-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #5b5bf0;
+    cursor: pointer;
+  }
+</style>
+
+<button id="hbNotifFab" type="button" onclick="openHbNotifModal()">🔔 إشعارات</button>
+
+<div id="hbNotifModal" onclick="if(event.target===this) closeHbNotifModal()">
+  <div class="hb-notif-box">
+    <h3 style="margin:0 0 6px;">🔔 نظام الإشعارات (أندرويد + متصفح)</h3>
+    <p id="hbNotifEnvStatus" style="font-size:0.8rem; color:var(--muted,#6a7392); margin:0 0 12px; line-height:1.55;">
+      فعّل الإشعارات عشان توصلك تنبيهات المؤقت والبلوكات والمواعيد والوقاية من الصيام في شريط الإشعارات.
+    </p>
+
+    <label class="hb-notif-row">
+      <span>✅ تفعيل نظام الإشعارات</span>
+      <input type="checkbox" id="hbNotifEnabledChk" />
+    </label>
+    <label class="hb-notif-row">
+      <span>⏳ عداد «فقط ابدأ» (إشعار انتهاء الـ 10 دقايق والمراحل)</span>
+      <input type="checkbox" id="hbNotifSandChk" />
+    </label>
+    <label class="hb-notif-row">
+      <span>🪙 عداد الذهب (شريط متابعة شغال + تنبيه كل ساعة)</span>
+      <input type="checkbox" id="hbNotifGoldChk" />
+    </label>
+    <label class="hb-notif-row">
+      <span>🧱 بداية كل بلوك زمني مع مهامه</span>
+      <input type="checkbox" id="hbNotifBlocksChk" />
+    </label>
+    <label class="hb-notif-row">
+      <span>⏰ التذكيرات (بداية اليوم 7 ص + قبل ساعتين + لحظة الموعد)</span>
+      <input type="checkbox" id="hbNotifRemindersChk" />
+    </label>
+    <label class="hb-notif-row">
+      <span>🌙 حراسة الانضباط (تنبيه الـ 80% + الحصص الثابتة + الصيام)</span>
+      <input type="checkbox" id="hbNotifDisciplineChk" />
+    </label>
+
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">
+      <button type="button" class="btn btn-primary" style="flex:1;" onclick="saveHbNotifSettings()">حفظ وتفعيل</button>
+      <button type="button" class="btn btn-outline" onclick="sendHbTestNotification()">🔔 تجربة</button>
+      <button type="button" class="btn btn-outline" onclick="closeHbNotifModal()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const NOTIF_CFG_KEY = '__habitico_notif_cfg';
+  const CHANNEL_ALERTS = 'habitico_alerts';
+  const CHANNEL_TIMER = 'habitico_timer';
+  let syncTimer = null;
+  let lastScheduleSig = '';
+  let channelsReady = false;
+  let webTimers = [];
+
+  function getNativeLN() {
+    try {
+      if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+        return (window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) || null;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function getNotifCfg() {
+    const def = { enabled: true, sand: true, gold: true, blocks: true, reminders: true, discipline: true };
+    try {
+      const raw = localStorage.getItem(NOTIF_CFG_KEY);
+      if (raw) return Object.assign(def, JSON.parse(raw));
+    } catch (e) {}
+    return def;
+  }
+
+  function saveNotifCfg(cfg) {
+    try { localStorage.setItem(NOTIF_CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  }
+
+  function updateNotifFab() {
+    const fab = document.getElementById('hbNotifFab');
+    if (!fab) return;
+    const cfg = getNotifCfg();
+    const isNative = !!getNativeLN();
+    if (!cfg.enabled) {
+      fab.className = '';
+      fab.textContent = '🔕 إشعارات';
+    } else {
+      fab.className = 'active';
+      fab.textContent = isNative ? '🔔 إشعارات (APK)' : '🔔 إشعارات';
+    }
+  }
+
+  async function ensurePermission(interactive) {
+    const ln = getNativeLN();
+    if (ln) {
+      try {
+        const perm = await ln.checkPermissions();
+        if (perm && perm.display === 'granted') {
+          await ensureAndroidChannels(ln);
+          return true;
+        }
+        if (interactive) {
+          const req = await ln.requestPermissions();
+          if (req && req.display === 'granted') {
+            await ensureAndroidChannels(ln);
+            return true;
+          }
+        }
+      } catch (e) {}
+      return false;
+    }
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') return true;
+      if (interactive && Notification.permission !== 'denied') {
+        try {
+          const res = await Notification.requestPermission();
+          return res === 'granted';
+        } catch (e) {}
+      }
+    }
+    return false;
+  }
+
+  async function ensureAndroidChannels(ln) {
+    if (channelsReady || !ln || typeof ln.createChannel !== 'function') return;
+    try {
+      await ln.createChannel({
+        id: CHANNEL_ALERTS,
+        name: 'تنبيهات Habitico والمواعيد',
+        description: 'إشعارات انتهاء المؤقت، بداية البلوكات، التذكيرات، وحراسة الـ 80% والصيام',
+        importance: 5,
+        visibility: 1,
+        vibration: true,
+        lights: true
+      });
+      await ln.createChannel({
+        id: CHANNEL_TIMER,
+        name: 'مؤقت المذاكرة النشط',
+        description: 'إشعار متابعة مستمر صامت أثناء عمل عداد الذهب أو فقط ابدأ',
+        importance: 2,
+        visibility: 1,
+        vibration: false
+      });
+      channelsReady = true;
+    } catch (e) {}
+  }
+
+  function fmtTimeAr(ts) {
+    try {
+      const d = new Date(ts);
+      let h = d.getHours();
+      const m = String(d.getMinutes()).padStart(2, '0');
+      const ap = h >= 12 ? 'م' : 'ص';
+      h = h % 12 || 12;
+      return `${h}:${m} ${ap}`;
+    } catch (e) { return ''; }
+  }
+
+  function buildDateAt(ymd, hhmm) {
+    const parts = String(ymd || '').split('-').map(Number);
+    const tp = String(hhmm || '09:00').split(':').map(Number);
+    if (parts.length !== 3 || tp.length < 2) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2], tp[0], tp[1], 0, 0);
+  }
+
+  function showWebNotification(title, body, tag) {
+    try {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(reg => {
+          if (reg && typeof reg.showNotification === 'function') {
+            reg.showNotification(title, { body, tag: tag || 'habitico', icon: 'icon.png', dir: 'rtl', lang: 'ar' });
+          } else {
+            new Notification(title, { body, tag: tag || 'habitico', icon: 'icon.png', dir: 'rtl', lang: 'ar' });
+          }
+        }).catch(() => {
+          try { new Notification(title, { body, tag: tag || 'habitico', icon: 'icon.png', dir: 'rtl', lang: 'ar' }); } catch (e) {}
+        });
+      } else {
+        new Notification(title, { body, tag: tag || 'habitico', icon: 'icon.png', dir: 'rtl', lang: 'ar' });
+      }
+    } catch (e) {}
+  }
+
+  function collectPlannedNotifications() {
+    const cfg = getNotifCfg();
+    const list = [];
+    const ongoing = [];
+    if (!cfg.enabled || typeof state !== 'object' || !state) return { list, ongoing };
+
+    const now = Date.now();
+    const sysToday = (typeof getSystemTodayYMD === 'function') ? getSystemTodayYMD() : new Date().toISOString().slice(0, 10);
+
+    // 1. عداد فقط ابدأ (Sand Session: 10m + stages + ongoing bar)
+    if (cfg.sand && state.sandSession) {
+      const s = state.sandSession;
+      if (!s.paused && !s.awaiting && s.phaseStartTs && s.phaseDurSec) {
+        const endTs = s.phaseStartTs + (s.phaseDurSec * 1000);
+        if (endTs > now + 2000) {
+          let title = '⏳ أتممت الـ 10 دقائق! (فقط ابدأ)';
+          let body = `أحسنت يا صلاح! كسرت حاجز البداية في «${s.taskTitle || 'المذاكرة'}» — افتح Habitico للمواصلة أو الإنهاء.`;
+          if (s.phase === 'break') {
+            title = '🔔 انتهت الاستراحة!';
+            body = `حان وقت العودة إلى «${s.taskTitle || 'المذاكرة'}».`;
+          } else if (s.stage > 1) {
+            title = `🔥 أتممت المرحلة ${s.stage} بنجاح!`;
+            body = `انتهى وقت المرحلة في «${s.taskTitle || 'المذاكرة'}» — افتح التطبيق للمتابعة.`;
+          }
+          list.push({ id: 1001, title, body, at: endTs, channelId: CHANNEL_ALERTS });
+          ongoing.push({
+            id: 1002,
+            title: `⏳ فقط ابدأ شغال (${s.phase === 'break' ? 'استراحة' : 'مرحلة ' + s.stage})`,
+            body: `«${s.taskTitle || 'جلسة مذاكرة'}» • ينتهي الساعة ${fmtTimeAr(endTs)}`,
+            channelId: CHANNEL_TIMER
+          });
+        }
+      }
+    }
+
+    // 2. عداد الذهب (Gold Session: ongoing bar + hourly +5 gold alerts)
+    if (cfg.gold && state.goldSession) {
+      const g = state.goldSession;
+      if (!g.paused && g.startTs) {
+        const elapsedMs = (g.accumMs || 0) + Math.max(0, now - g.startTs);
+        const elapsedMin = Math.floor(elapsedMs / 60000);
+        const hrs = Math.floor(elapsedMin / 60);
+        const mins = elapsedMin % 60;
+        const elapsedTxt = hrs > 0 ? `${hrs} س ${mins} د` : `${mins} د`;
+        ongoing.push({
+          id: 1003,
+          title: `🪙 عداد الذهب شغال (${elapsedTxt})`,
+          body: `«${g.taskTitle || 'جلسة مذاكرة'}» • بدأ الساعة ${fmtTimeAr(g.startTs)}`,
+          channelId: CHANNEL_TIMER
+        });
+        // جدولة تنبيه كل ساعة كاملة (حتى 4 ساعات قادمة)
+        for (let k = 1; k <= 4; k++) {
+          const nextHourTotalMs = (hrs + k) * 3600000;
+          const remainMs = nextHourTotalMs - elapsedMs;
+          if (remainMs > 5000) {
+            list.push({
+              id: 1010 + k,
+              title: `🪙 أتممت ${hrs + k} ساعة مذاكرة (+5 عملات ذهبية!)`,
+              body: `ممتاز يا صلاح! واصل إنجازك في «${g.taskTitle || 'المذاكرة'}».`,
+              at: now + remainMs,
+              channelId: CHANNEL_ALERTS
+            });
+          }
+        }
+      }
+    }
+
+    // 3. بداية بلوكات Time Blocking بمهامها (اليوم وغداً)
+    if (cfg.blocks && state.timeBlocking && Array.isArray(state.timeBlocking.blocks)) {
+      let blockNotifId = 2000;
+      const datesToCheck = [sysToday];
+      if (typeof addDays === 'function') datesToCheck.push(addDays(sysToday, 1));
+
+      datesToCheck.forEach(dStr => {
+        state.timeBlocking.blocks.forEach(b => {
+          if (!b || !b.startTime) return;
+          const dt = buildDateAt(dStr, b.startTime);
+          if (!dt || dt.getTime() <= now + 5000) return;
+          const tasks = (typeof getTbTasksForBlock === 'function') ? (getTbTasksForBlock(dStr, b.id) || []).filter(x => x && !x.done) : [];
+          const tLabel = (typeof tbFormatTime12Ar === 'function') ? tbFormatTime12Ar(b.startTime) : b.startTime;
+          const body = tasks.length > 0
+            ? 'المهام: ' + tasks.slice(0, 4).map(x => x.title).join(' • ')
+            : 'بلوك متاح للمذاكرة — افتح Habitico وابدأ الآن!';
+          if (blockNotifId < 2095) {
+            list.push({
+              id: blockNotifId++,
+              title: `🧱 بدأ بلوك: ${b.name} (${tLabel})`,
+              body,
+              at: dt.getTime(),
+              channelId: CHANNEL_ALERTS
+            });
+          }
+        });
+      });
+    }
+
+    // 4. التذكيرات والمواعيد (بداية اليوم 7 ص + قبل ساعتين + لحظة الموعد)
+    if (cfg.reminders && typeof getAllTbReminderItems === 'function') {
+      const allRem = (getAllTbReminderItems() || []).filter(r => r && r.task && !r.task.done && r.dateStr >= sysToday);
+      const byDay = {};
+      allRem.forEach(r => {
+        if (!byDay[r.dateStr]) byDay[r.dateStr] = [];
+        byDay[r.dateStr].push(r);
+      });
+
+      let remId = 3000;
+      Object.keys(byDay).sort().slice(0, 7).forEach(dStr => {
+        const dayItems = byDay[dStr];
+        const morningDt = buildDateAt(dStr, '07:00');
+        if (morningDt && morningDt.getTime() > now + 5000 && remId < 3180) {
+          list.push({
+            id: remId++,
+            title: `🌅 مواعيد اليوم (${dayItems.length})`,
+            body: dayItems.slice(0, 4).map(r => `${r.task.title} (${r.effectiveTime})`).join(' • '),
+            at: morningDt.getTime(),
+            channelId: CHANNEL_ALERTS
+          });
+        }
+        dayItems.forEach(r => {
+          const dueDt = buildDateAt(dStr, r.effectiveTime);
+          if (!dueDt) return;
+          const preTs = dueDt.getTime() - (120 * 60000);
+          const timeLbl = (typeof tbFormatTime12Ar === 'function') ? tbFormatTime12Ar(r.effectiveTime) : r.effectiveTime;
+          if (preTs > now + 5000 && remId < 3180) {
+            list.push({
+              id: remId++,
+              title: `⏰ بعد ساعتين: ${r.task.title}`,
+              body: `موعدك الساعة ${timeLbl} (${r.blockName || 'تذكير'}).`,
+              at: preTs,
+              channelId: CHANNEL_ALERTS
+            });
+          }
+          if (dueDt.getTime() > now + 5000 && remId < 3180) {
+            list.push({
+              id: remId++,
+              title: `🚨 حان وقت الموعد الآن: ${r.task.title}`,
+              body: `الساعة ${timeLbl} (${r.blockName || 'تذكير'}).`,
+              at: dueDt.getTime(),
+              channelId: CHANNEL_ALERTS
+            });
+          }
+        });
+      });
+    }
+
+    // 5. حراسة الانضباط (الحصص الثابتة + تحذير الـ 80% + تذكير الصيام)
+    if (cfg.discipline && typeof getWeekSundayYMD === 'function') {
+      const curSun = getWeekSundayYMD(sysToday);
+      const dow = (typeof parseYMD === 'function') ? parseYMD(sysToday).getDay() : new Date().getDay();
+
+      // أ) تذكير مسائي للحصص الثابتة (8:30 م) لو متبقي دقائق اليوم
+      if (typeof ensureWeeklyFixedQuotas === 'function' && typeof getWeeklyQuotaDailyLoggedMinutes === 'function') {
+        const quotas = ensureWeeklyFixedQuotas() || [];
+        const pendingQ = quotas.filter(q => (Number(q.dailyAvgMinutes) || 0) > 0 && getWeeklyQuotaDailyLoggedMinutes(q, sysToday) < Math.round(q.dailyAvgMinutes * 0.8));
+        const qDt = buildDateAt(sysToday, '20:30');
+        if (pendingQ.length > 0 && qDt && qDt.getTime() > now + 5000) {
+          list.push({
+            id: 4001,
+            title: '⏳ تذكير الحصص الثابتة لليوم',
+            body: 'لا تنسَ تسجيل ورد اليوم في: ' + pendingQ.map(q => q.title).join(' • '),
+            at: qDt.getTime(),
+            channelId: CHANNEL_ALERTS
+          });
+        }
+      }
+
+      // ب) تحذير نسبة الـ 80% يوم الخميس أو السبت (6:00 م)
+      if ((dow === 4 || dow === 6) && typeof calculateWeeklyTasksProgress === 'function') {
+        const prog = calculateWeeklyTasksProgress(curSun);
+        const wDt = buildDateAt(sysToday, '18:00');
+        if (prog && prog.hasTasks && prog.pct !== null && prog.pct < 80 && wDt && wDt.getTime() > now + 5000) {
+          list.push({
+            id: 4002,
+            title: `⚠️ إنجاز الأسبوع ${prog.pct}% (تحت الـ 80%)`,
+            body: 'شد حيلك قبل نهاية السبت عشان تتفادى عقوبة الصيام وتحافظ على سلسلتك!',
+            at: wDt.getTime(),
+            channelId: CHANNEL_ALERTS
+          });
+        }
+      }
+
+      // ج) تذكير صيام الإثنين والخميس (الأحد 8:00 م والأربعاء 8:00 م)
+      const pendingFast = (state.fastingPenalties || []).filter(p => p && p.status === 'pending');
+      if (pendingFast.length > 0 && (dow === 0 || dow === 3)) {
+        const fDt = buildDateAt(sysToday, '20:00');
+        if (fDt && fDt.getTime() > now + 5000) {
+          list.push({
+            id: 4003,
+            title: dow === 0 ? '🌙 تذكير عقوبة الصيام غداً الإثنين' : '🌙 تذكير عقوبة الصيام غداً الخميس',
+            body: `عليك عقوبة صيام معلّقة (${pendingFast[0].reason || 'التزام أسبوعي'}) — استعد للسحور والنية.`,
+            at: fDt.getTime(),
+            channelId: CHANNEL_ALERTS
+          });
+        }
+      }
+    }
+
+    // ترتيب حسب الأقرب والحد الأقصى 48 إشعاراً للحفاظ على استقرار AlarmManager
+    list.sort((a, b) => a.at - b.at);
+    return { list: list.slice(0, 48), ongoing };
+  }
+
+  async function syncAllNotifications(force) {
+    updateNotifFab();
+    const { list, ongoing } = collectPlannedNotifications();
+    const sig = JSON.stringify({
+      l: list.map(x => [x.id, x.title, x.body, Math.floor(x.at / 1000)]),
+      o: ongoing.map(x => [x.id, x.title, x.body])
+    });
+    if (!force && sig === lastScheduleSig) return;
+
+    const granted = await ensurePermission(false);
+    if (!granted) return;
+    lastScheduleSig = sig;
+
+    const ln = getNativeLN();
+    if (ln) {
+      try {
+        const pending = await ln.getPending();
+        const managedIds = (pending && pending.notifications ? pending.notifications : [])
+          .filter(n => n.id >= 1000 && n.id < 5000)
+          .map(n => ({ id: n.id }));
+        if (managedIds.length > 0) await ln.cancel({ notifications: managedIds });
+
+        // إلغاء الإشعارات المستمرة للمؤقتات المتوقفة
+        const activeOngoingIds = new Set(ongoing.map(x => x.id));
+        const cancelOngoing = [1002, 1003].filter(id => !activeOngoingIds.has(id)).map(id => ({ id }));
+        if (cancelOngoing.length > 0) {
+          await ln.cancel({ notifications: cancelOngoing });
+          if (typeof ln.removeDeliveredNotifications === 'function') {
+            await ln.removeDeliveredNotifications({ notifications: cancelOngoing }).catch(() => {});
+          }
+        }
+
+        const toSchedule = [];
+        ongoing.forEach(o => {
+          toSchedule.push({
+            id: o.id,
+            title: o.title,
+            body: o.body,
+            channelId: o.channelId,
+            ongoing: true,
+            autoCancel: false,
+            schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true }
+          });
+        });
+        list.forEach(item => {
+          toSchedule.push({
+            id: item.id,
+            title: item.title,
+            body: item.body,
+            channelId: item.channelId,
+            schedule: { at: new Date(item.at), allowWhileIdle: true }
+          });
+        });
+        if (toSchedule.length > 0) {
+          await ln.schedule({ notifications: toSchedule });
+        }
+      } catch (e) {
+        console.error('Capacitor LocalNotifications sync error:', e);
+      }
+    } else {
+      // Fallback للمتصفح (PWA): جدولة الإشعارات القريبة خلال الساعات القادمة طول ما الصفحة مفتوحة
+      webTimers.forEach(t => clearTimeout(t));
+      webTimers = [];
+      const now = Date.now();
+      list.filter(item => item.at - now <= 6 * 3600000).forEach(item => {
+        const delay = Math.max(1000, item.at - now);
+        webTimers.push(setTimeout(() => showWebNotification(item.title, item.body, 'hb_' + item.id), delay));
+      });
+    }
+  }
+
+  function scheduleNotifSync(delayMs) {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncAllNotifications(false), typeof delayMs === 'number' ? delayMs : 1200);
+  }
+
+  // ربط تلقائي مع saveState() بدون تعديل جسم الدالة الأصلية
+  if (typeof window.saveState === 'function') {
+    const _origSaveState = window.saveState;
+    window.saveState = function() {
+      const res = _origSaveState.apply(this, arguments);
+      scheduleNotifSync(1200);
+      return res;
+    };
+  }
+
+  // تحديث إشعار المؤقت المستمر كل دقيقة أثناء تشغيل عداد الذهب أو فقط ابدأ
+  setInterval(() => {
+    if (typeof state === 'object' && state && ((state.goldSession && !state.goldSession.paused) || (state.sandSession && !state.sandSession.paused))) {
+      syncAllNotifications(false);
+    }
+  }, 60000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleNotifSync(800);
+  });
+
+  window.openHbNotifModal = function() {
+    const cfg = getNotifCfg();
+    const isNative = !!getNativeLN();
+    document.getElementById('hbNotifEnabledChk').checked = !!cfg.enabled;
+    document.getElementById('hbNotifSandChk').checked = !!cfg.sand;
+    document.getElementById('hbNotifGoldChk').checked = !!cfg.gold;
+    document.getElementById('hbNotifBlocksChk').checked = !!cfg.blocks;
+    document.getElementById('hbNotifRemindersChk').checked = !!cfg.reminders;
+    document.getElementById('hbNotifDisciplineChk').checked = !!cfg.discipline;
+    const statusEl = document.getElementById('hbNotifEnvStatus');
+    if (statusEl) {
+      statusEl.textContent = isNative
+        ? '✅ تعمل الآن داخل تطبيق الأندرويد (APK) — الإشعارات المحلية تعمل أوفلاين وحتى لو التطبيق مقفول!'
+        : '🌐 تعمل حالياً عبر المتصفح — الإشعارات تعمل طول ما التطبيق مفتوح أو في الخلفية القريبة (لإشعارات والتطبيق مقفول استخدم نسخة الـ APK).';
+    }
+    document.getElementById('hbNotifModal').style.display = 'flex';
+  };
+
+  window.closeHbNotifModal = function() {
+    document.getElementById('hbNotifModal').style.display = 'none';
+  };
+
+  window.saveHbNotifSettings = async function() {
+    const cfg = {
+      enabled: !!document.getElementById('hbNotifEnabledChk').checked,
+      sand: !!document.getElementById('hbNotifSandChk').checked,
+      gold: !!document.getElementById('hbNotifGoldChk').checked,
+      blocks: !!document.getElementById('hbNotifBlocksChk').checked,
+      reminders: !!document.getElementById('hbNotifRemindersChk').checked,
+      discipline: !!document.getElementById('hbNotifDisciplineChk').checked
+    };
+    saveNotifCfg(cfg);
+    closeHbNotifModal();
+    if (cfg.enabled) {
+      const ok = await ensurePermission(true);
+      if (ok) {
+        await syncAllNotifications(true);
+        if (typeof showAppToast === 'function') showAppToast('🔔 تم تفعيل وجدولة إشعارات Habitico بنجاح!');
+      } else if (typeof showAppToast === 'function') {
+        showAppToast('⚠️ الرجاء السماح بصلاحية الإشعارات من إعدادات الجهاز.');
+      }
+    } else {
+      await syncAllNotifications(true);
+      if (typeof showAppToast === 'function') showAppToast('🔕 تم إيقاف الإشعارات.');
+    }
+    updateNotifFab();
+  };
+
+  window.sendHbTestNotification = async function() {
+    const ok = await ensurePermission(true);
+    if (!ok) {
+      if (typeof showAppToast === 'function') showAppToast('⚠️ يرجى السماح بصلاحية الإشعارات أولاً.');
+      return;
+    }
+    const ln = getNativeLN();
+    if (ln) {
+      try {
+        await ln.schedule({
+          notifications: [{
+            id: 4999,
+            title: '🔔 تجربة إشعار Habitico ناجحة!',
+            body: 'ممتاز يا صلاح! إشعارات الأندرويد شغالة عندك 100% حتى بدون نت.',
+            channelId: CHANNEL_ALERTS,
+            schedule: { at: new Date(Date.now() + 2000), allowWhileIdle: true }
+          }]
+        });
+        if (typeof showAppToast === 'function') showAppToast('🔔 سيصلك إشعار تجريبي خلال ثانيتين!');
+      } catch (e) {
+        if (typeof showAppToast === 'function') showAppToast('⚠️ تعذّر إرسال إشعار التجربة.');
+      }
+    } else {
+      showWebNotification('🔔 تجربة إشعار Habitico ناجحة!', 'إشعارات المتصفح شغالة عندك تمام!');
+      if (typeof showAppToast === 'function') showAppToast('🔔 تم إرسال إشعار تجريبي.');
+    }
+  };
+
+  updateNotifFab();
+  scheduleNotifSync(2500);
 })();
 </script>
 
