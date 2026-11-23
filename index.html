@@ -6042,12 +6042,16 @@ textarea:focus {
                 <textarea id="newTaskStepsInput" rows="3" placeholder="الخطوات (اختياري) — اكتب كل خطوة في سطر منفصل"></textarea>
 
                 <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
-                  <select id="newTaskStarsSelect" style="width:auto; min-width:200px;">
+                  <select id="newTaskStarsSelect" style="width:auto; min-width:170px;">
                     <option value="1">⭐ خفيفة (1 نجمة)</option>
                     <option value="2">⭐⭐ متوسطة (2 نجمتان)</option>
                     <option value="3" selected>⭐⭐⭐ شاقة (3 نجوم)</option>
                     <option value="4">⭐⭐⭐⭐ ملحمية (4 نجوم)</option>
                   </select>
+                  <div style="display:inline-flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:4px 9px;">
+                    <label for="newTaskEstMinInput" style="font-size:0.76rem; font-weight:800; color:var(--muted); margin:0; white-space:nowrap;">⏱️ الزمن (دقائق):</label>
+                    <input type="number" id="newTaskEstMinInput" min="5" max="1440" step="5" placeholder="تلقائي" style="width:82px; padding:4px 6px; font-size:0.82rem; font-weight:800;" title="اختياري: حدد الزمن المقدر لهذه المهمة بالدقائق (مثلاً 45 أو 120)، أو اتركه فارغاً ليستخدم المستشار وسيط نوع المهمة تلقائياً" />
+                  </div>
                   <div style="display:flex; gap:8px;">
                     <button type="button" class="btn btn-success btn-sm" onclick="saveNewStudyTask()">+ حفظ المهمة</button>
                     <button type="button" class="btn btn-outline btn-sm" onclick="toggleAddTaskDrawer()">إلغاء</button>
@@ -6878,6 +6882,11 @@ textarea:focus {
           <option value="3">⭐⭐⭐ شاقة</option>
           <option value="4">⭐⭐⭐⭐ ملحمية</option>
         </select>
+      </div>
+      <div class="hb-field">
+        <label for="teEstMin">⏱️ الزمن المقدر لهذه المهمة تحديداً (بالدقائق — اختياري)</label>
+        <input type="number" id="teEstMin" min="5" max="1440" step="5" placeholder="اتركه فارغاً لاستخدام الوسيط الإحصائي التلقائي لنوع المهمة" />
+        <div class="hint" style="font-size:0.73rem; margin-top:3px;">يمكنك تخصيص زمن دقيق لأي مهمة عامة أو لأي درس تعرف أنه أقصر/أطول من المعتاد، وسيحترمه المستشار الذكي وميزان الأسبوع فوراً.</div>
       </div>
       <div class="hb-field">
         <label id="teStepsFieldLabel">الخطوات (اختياري — اتركها فارغة لمهمة بضغطة واحدة)</label>
@@ -10248,6 +10257,9 @@ textarea:focus {
       registerSavedTaskCategory(catName);
       const taskTypeId = (typeSel && typeSel.value) ? typeSel.value : getDefaultTaskTypeIdForCategory(catName);
       const subSteps = parseStepLines(stepsInp ? stepsInp.value : '');
+      const estInp = document.getElementById('newTaskEstMinInput');
+      const rawEst = estInp && estInp.value !== '' ? Math.round(Number(estInp.value)) : null;
+      const customEstMin = (rawEst && rawEst >= 5 && rawEst <= 1440) ? rawEst : null;
 
       state.studyTasks.push({
         id: 'st_' + Date.now(),
@@ -10255,6 +10267,7 @@ textarea:focus {
         category: catName,
         taskTypeId,
         stars: parseInt(starsSel.value, 10) || 3,
+        customEstMin,
         weekSunday: targetSun,
         done: false,
         completedAt: null,
@@ -10263,6 +10276,7 @@ textarea:focus {
 
       titleInp.value = '';
       if (stepsInp) stepsInp.value = '';
+      if (estInp) estInp.value = '';
       toggleAddTaskDrawer();
       saveState();
       renderAll();
@@ -10282,6 +10296,8 @@ textarea:focus {
       document.getElementById('teCategory').value = cat;
       populateSavedCategoryControls('edit', cat, typeId);
       document.getElementById('teStars').value = String(t.stars || 3);
+      const teEstEl = document.getElementById('teEstMin');
+      if (teEstEl) teEstEl.value = (typeof t.customEstMin === 'number' && t.customEstMin > 0) ? String(t.customEstMin) : '';
       renderTaskEditSteps();
       document.getElementById('taskEditModal').style.display = 'flex';
     }
@@ -10388,6 +10404,9 @@ textarea:focus {
       const teTypeSel = document.getElementById('teTaskTypeSelect');
       t.taskTypeId = (teTypeSel && teTypeSel.value) ? teTypeSel.value : getDefaultTaskTypeIdForCategory(t.category);
       t.stars = parseInt(document.getElementById('teStars').value, 10) || 3;
+      const teEstEl = document.getElementById('teEstMin');
+      const rawEditEst = (teEstEl && teEstEl.value !== '') ? Math.round(Number(teEstEl.value)) : null;
+      t.customEstMin = (rawEditEst && rawEditEst >= 5 && rawEditEst <= 1440) ? rawEditEst : null;
       t.subSteps = cleanStepsTree(_taskEdit.steps);
       syncTaskTreeStatus(t);
       saveState();
@@ -11250,6 +11269,7 @@ textarea:focus {
       });
 
       const starIcons = { 1: '⭐ خفيفة', 2: '⭐⭐ متوسطة', 3: '⭐⭐⭐ شاقة', 4: '⭐⭐⭐⭐ ملحمية' };
+      const _cachedRenderBench = (typeof computeCategoryPlanningBenchmarks === 'function') ? computeCategoryPlanningBenchmarks().categories : {};
 
       container.innerHTML = Object.entries(tasksByCategory).map(([catName, catTasks]) => {
         const catEmoji = getTaskCategoryEmoji(catName);
@@ -11317,6 +11337,11 @@ textarea:focus {
 
                 const tTypeObj = getTaskTypeObj(t.category || 'عام', t.taskTypeId);
                 const stepLbl = getEffectiveStepLabelForTask(t);
+                const hasCustomEst = (typeof t.customEstMin === 'number' && t.customEstMin > 0);
+                const taskEstMinDisp = hasCustomEst
+                  ? t.customEstMin
+                  : (typeof estimateSingleTaskFullMinutes === 'function' ? estimateSingleTaskFullMinutes(t, _cachedRenderBench) : (tTypeObj.defaultEstMinutes || 60));
+                const estChipTxt = (typeof fmtMinutesAr === 'function') ? fmtMinutesAr(taskEstMinDisp) : (taskEstMinDisp + ' د');
                 return `
                 <div class="dopamine-task-card ${t.done ? 'completed' : ''}" style="margin-bottom:10px; align-items:flex-start;">
                   <div style="flex:1; min-width:0;">
@@ -11324,6 +11349,7 @@ textarea:focus {
                       <span class="task-type-pill">${tTypeObj.emoji || '📖'} ${hbEsc(tTypeObj.name)}</span>
                       <span class="star-badge star-${t.stars}">${starIcons[t.stars] || '⭐'}</span>
                       <span class="chip" style="font-size:0.71rem; padding:2px 8px;">${taskWeekSharePct(t, 1.0)}% من الأسبوع</span>
+                      <span class="chip" onclick="editStudyTask('${t.id}')" style="cursor:pointer; font-size:0.71rem; padding:2px 8px; ${hasCustomEst ? 'background:var(--accent-light); color:var(--accent-ink); border-color:var(--accent); font-weight:800;' : ''}" title="اضغط لتعديل الزمن المقدر لهذه المهمة">⏱️ ${estChipTxt}${hasCustomEst ? ' (يدوي)' : ''}</span>
                       ${t.done ? '<span class="chip done" style="font-size:0.71rem; padding:2px 8px;">✅ منجزة</span>' : ''}
                       ${hasSt ? `<span class="chip" style="font-size:0.71rem; padding:2px 8px;">${hbEsc(stepLbl)}: ${doneTopSteps}/${t.subSteps.length} (${pctDoneTask}%)</span>` : ''}
                     </div>
@@ -21511,30 +21537,64 @@ textarea:focus {
             if (m >= 5) tpCompTaskMins.push(m);
           });
 
+          const isGeneralCat = (String(cat || '').trim() === 'عام');
           let tpAvgTaskMin = Number(tp.defaultEstMinutes) || 90;
           let isMeasuredFromLogs = false;
-          // نعتمد المتوسط المقاس من السجلات إذا توفرت مهام مكتملة مسجلة الزمن فعلياً، أو إذا سجل جلسات على نوع المهمة وأكمل مهام بعد آخر ضبط يدوي
-          if (tpCompTaskMins.length >= 2) {
-            tpAvgTaskMin = (cfg.advisorUseMedian !== false)
-              ? Math.round(advMedian(tpCompTaskMins))
-              : Math.round(tpCompTaskMins.reduce((a, b) => a + b, 0) / tpCompTaskMins.length);
-            isMeasuredFromLogs = true;
-          } else if (tpCompTaskMins.length === 1 && !overrideTs) {
-            tpAvgTaskMin = Math.round(tpCompTaskMins[0]);
-            isMeasuredFromLogs = true;
+          let calibrationSource = 'initial_default';
+          let measuredSamplesCount = 0;
+
+          // تصنيف «عام» مستثنى من إعادة معايرة الوسيط الإحصائي لأن مهامه متفرقة وغير متجانسة (تعتمد على الزمن اليدوي لكل مهمة)
+          if (isGeneralCat) {
+            calibrationSource = 'general_excluded';
           } else {
-            // إذا كان المستخدم يسجل الوقت باختيار (التصنيف/نوع المهمة العام) ثم يعلّم المهام مكتملة
-            const freeTypeLogsMin = tpLogsAfterOverride
-              .filter(l => l.kind === 'category')
-              .reduce((a, x) => a + (Number(x.durationMinutes) || 0), 0);
-            const compTasksAfterOverride = tpCompTasks.filter(t => {
-              if (!overrideTs) return true;
-              const overrideYMD = formatDateYMD(new Date(overrideTs));
-              return !t.completedAt || t.completedAt >= overrideYMD;
-            });
-            if (freeTypeLogsMin >= 30 && compTasksAfterOverride.length >= 2) {
-              tpAvgTaskMin = Math.round(freeTypeLogsMin / compTasksAfterOverride.length);
+            // 1) الوسيط الحي من المهام المكتملة داخل النافذة الزمنية المتحركة
+            let activeSamples = tpCompTaskMins.slice();
+            if (activeSamples.length >= 2) {
+              tpAvgTaskMin = (cfg.advisorUseMedian !== false)
+                ? Math.round(advMedian(activeSamples))
+                : Math.round(activeSamples.reduce((a, b) => a + b, 0) / activeSamples.length);
               isMeasuredFromLogs = true;
+              calibrationSource = 'rolling_median';
+              measuredSamplesCount = activeSamples.length;
+            } else {
+              // 2) إذا قلّت العينات داخل النافذة المتحركة، نوسّع تلقائياً لآخر 15 مهمة مكتملة مسجّلة الزمن من نفس النوع
+              // حتى لا يعود المستشار أبداً للتخمين المبدئي طالما توجد بيانات حقيقية في السجل!
+              const allTimeTpComp = catTasks
+                .filter(t => t && t.done && (t.taskTypeId || defaultTypeId) === tpId)
+                .sort((a, b) => String(b.completedAt || '').localeCompare(String(a.completedAt || '')));
+              const recentHistoryMins = [];
+              allTimeTpComp.forEach(t => {
+                if (recentHistoryMins.length >= 15) return;
+                const m = allLogs
+                  .filter(l => l && l.taskId === t.id && (!overrideTs || l.timestamp >= overrideTs))
+                  .reduce((a, x) => a + (Number(x.durationMinutes) || 0), 0);
+                if (m >= 5) recentHistoryMins.push(m);
+              });
+
+              if (recentHistoryMins.length >= 1) {
+                tpAvgTaskMin = (cfg.advisorUseMedian !== false)
+                  ? Math.round(advMedian(recentHistoryMins))
+                  : Math.round(recentHistoryMins.reduce((a, b) => a + b, 0) / recentHistoryMins.length);
+                isMeasuredFromLogs = true;
+                calibrationSource = recentHistoryMins.length >= 2 ? 'recent_history_median' : 'single_sample';
+                measuredSamplesCount = recentHistoryMins.length;
+              } else {
+                // 3) إذا كان المستخدم يسجل الوقت باختيار (التصنيف/نوع المهمة) ثم يعلّم المهام مكتملة
+                const freeTypeLogsMin = tpLogsAfterOverride
+                  .filter(l => l.kind === 'category')
+                  .reduce((a, x) => a + (Number(x.durationMinutes) || 0), 0);
+                const compTasksAfterOverride = tpCompTasks.filter(t => {
+                  if (!overrideTs) return true;
+                  const overrideYMD = formatDateYMD(new Date(overrideTs));
+                  return !t.completedAt || t.completedAt >= overrideYMD;
+                });
+                if (freeTypeLogsMin >= 20 && compTasksAfterOverride.length >= 1) {
+                  tpAvgTaskMin = Math.max(5, Math.round(freeTypeLogsMin / compTasksAfterOverride.length));
+                  isMeasuredFromLogs = true;
+                  calibrationSource = 'category_logs_avg';
+                  measuredSamplesCount = compTasksAfterOverride.length;
+                }
+              }
             }
           }
 
@@ -21588,11 +21648,13 @@ textarea:focus {
             completedPrimaryStepsCount: tpCompPrimarySteps,
             completedSubStepsCount: tpCompSubSteps,
             avgTaskMinutes: Math.max(5, tpAvgTaskMin),
-            p80TaskMinutes: tpCompTaskMins.length >= 3 ? Math.max(5, Math.round(advPercentile(tpCompTaskMins, 0.8))) : null,
+            p80TaskMinutes: (!isGeneralCat && tpCompTaskMins.length >= 3) ? Math.max(5, Math.round(advPercentile(tpCompTaskMins, 0.8))) : null,
             sampleCount: tpCompTaskMins.length,
             avgPrimaryStepMinutes: Math.max(5, tpAvgPrimaryStepMin),
             avgSubStepMinutes: Math.max(5, tpAvgSubStepMin),
             isMeasuredFromLogs,
+            calibrationSource,
+            measuredSamplesCount,
             isReliableSample: tpCompTaskMins.length >= 2 || (tpCompPrimarySteps >= 4 && tpTotalMin >= 25)
           };
         });
@@ -21794,20 +21856,24 @@ textarea:focus {
     }
 
     // مقياس النجوم (1..4⭐) مخصص للجاكبوت وشرط الـ 80% فقط ولا يغير الزمن التقديري للمهمة إطلاقاً!
-    function estimateSingleTaskRequiredMinutes(taskObj, benchMap) {
-      if (!taskObj || taskObj.done) return 0;
-      const tb = getTaskSpecificBenchmark(taskObj, benchMap);
-      if (taskHasSteps(taskObj)) {
-        const remRatio = Math.max(0, 1 - taskCompletionFraction(taskObj));
-        return Math.round(tb.avgTaskMinutes * remRatio);
+    // إذا خصص المستخدم زمناً يدوياً (customEstMin) للمهمة فله الأولوية المطلقة دائماً (سواء في "عام" أو في أي تصنيف دراسي).
+    function estimateSingleTaskFullMinutes(taskObj, benchMap) {
+      if (!taskObj) return 60;
+      if (typeof taskObj.customEstMin === 'number' && taskObj.customEstMin > 0) {
+        return Math.round(taskObj.customEstMin);
       }
+      const tb = getTaskSpecificBenchmark(taskObj, benchMap);
       return Math.round(tb.avgTaskMinutes);
     }
 
-    function estimateSingleTaskFullMinutes(taskObj, benchMap) {
-      if (!taskObj) return 60;
-      const tb = getTaskSpecificBenchmark(taskObj, benchMap);
-      return Math.round(tb.avgTaskMinutes);
+    function estimateSingleTaskRequiredMinutes(taskObj, benchMap) {
+      if (!taskObj || taskObj.done) return 0;
+      const full = estimateSingleTaskFullMinutes(taskObj, benchMap);
+      if (taskHasSteps(taskObj)) {
+        const remRatio = Math.max(0, 1 - taskCompletionFraction(taskObj));
+        return Math.round(full * remRatio);
+      }
+      return full;
     }
 
     // [إضافة] مهام الأسبوع التي تستهلك من ميزانية الفترة المختارة فعلاً:
@@ -21838,7 +21904,7 @@ textarea:focus {
       const activeIds = new Set((activeTypes || []).map(tp => tp.id));
       const offPlanMin = (existingCatTasks || [])
         .filter(t => t && !activeIds.has(t.taskTypeId || defaultTypeId))
-        .reduce((acc, t) => acc + estimateSingleTaskFullMinutes(t, benchCategories), 0);
+        .reduce((acc, t) => acc + estimateSingleTaskRemainingMinutes(t, benchCategories), 0);
       return Math.max(0, catAllocatedMin - offPlanMin);
     }
 
@@ -21979,8 +22045,14 @@ textarea:focus {
         const tb = getTpBench(tp);
         const unitMin = Math.max(5, tb.avgTaskMinutes);
         const stepMin = Math.max(5, tb.avgPrimaryStepMinutes);
-        const existingCount = (existingCatTasks || []).filter(t => (t.taskTypeId || defaultTypeId) === tp.id).length;
-        const existingMin = existingCount * unitMin;
+        const matchingExisting = (existingCatTasks || []).filter(t => (t.taskTypeId || defaultTypeId) === tp.id);
+        const existingCount = matchingExisting.length;
+        const existingMin = matchingExisting.reduce((acc, t) => {
+          if (!t || t.done) return acc;
+          const baseMin = (typeof t.customEstMin === "number" && t.customEstMin > 0) ? Math.round(t.customEstMin) : unitMin;
+          const frac = (typeof taskCompletionFraction === "function") ? Math.max(0, Math.min(1, taskCompletionFraction(t))) : 0;
+          return acc + Math.max(0, Math.round(baseMin * (1 - frac)));
+        }, 0);
 
         let tpTimeShareRatio = 1;
         let tpMin = catAllocatedMin;
@@ -22047,7 +22119,9 @@ textarea:focus {
       items.forEach(it => {
         it.actualTasksTimeMin = it.recUnits * it.unitMin;
         it.recSteps = it.tpMin > 0 ? Math.max(1, Math.round(it.tpMin / it.stepMin)) : 0;
-        it.remainingToAddUnits = Math.max(0, it.recUnits - it.existingCount);
+        it.remainingToAddUnits = it.unitMin > 0
+          ? Math.max(0, Math.floor((Math.max(0, it.actualTasksTimeMin - it.existingMin) + 1e-7) / it.unitMin))
+          : Math.max(0, it.recUnits - it.existingCount);
         it.FitsInSurplusCount = leftoverSurplusMin >= it.unitMin ? Math.floor(leftoverSurplusMin / it.unitMin) : 0;
       });
 
@@ -22817,7 +22891,7 @@ textarea:focus {
       const existingWeekTasks = filterTasksInsidePlanWindow(allWeekTasksRaw, targetSun, planStartDateYMD);
       const unselectedTasksMin = existingWeekTasks
         .filter(t => !selectedCats.includes(t.category || 'عام'))
-        .reduce((acc, t) => acc + estimateSingleTaskFullMinutes(t, bench.categories), 0);
+        .reduce((acc, t) => acc + estimateSingleTaskRemainingMinutes(t, bench.categories), 0);
 
       const poolForSelectedCatsMin = (cfg.advisorSubtractExistingTasks !== false)
         ? Math.max(0, budget.plannableForTasksMin - unselectedTasksMin)
@@ -23015,7 +23089,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
                           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <span style="font-weight:900; font-size:0.94rem; color:var(--text);">${tp.emoji || '📖'} ${hbEsc(tp.name)}</span>
                             <span class="chip" style="font-size:0.72rem;">حصة الزمن: ${it.tpTimeSharePct}% (${fmtMinutesAr(it.tpMin)})</span>
-                            <span class="hint" style="font-size:0.72rem;">زمن الواحدة${unitLbl ? ` (${hbEsc(unitLbl)})` : ''}: <strong>${fmtMinutesAr(it.unitMin)}</strong>${(cfg.advisorShowRange !== false && it.tb && it.tb.p80TaskMinutes && it.tb.p80TaskMinutes > it.unitMin) ? ` <small>(الأبطأ المعتاد 80%: ${fmtMinutesAr(it.tb.p80TaskMinutes)})</small>` : ''}</span>
+                            <span class="hint" style="font-size:0.72rem;">زمن الواحدة${unitLbl ? ` (${hbEsc(unitLbl)})` : ''}: <strong>${fmtMinutesAr(it.unitMin)}</strong> ${it.tb && it.tb.isMeasuredFromLogs ? `<span class="chip done" style="font-size:0.65rem; padding:1px 6px;">📊 وسيط حي (${it.tb.measuredSamplesCount || 1})</span>` : `<span class="chip" style="font-size:0.65rem; padding:1px 6px;">📝 مبدئي</span>`}${(cfg.advisorShowRange !== false && it.tb && it.tb.p80TaskMinutes && it.tb.p80TaskMinutes > it.unitMin) ? ` <small>(الأبطأ 80%: ${fmtMinutesAr(it.tb.p80TaskMinutes)})</small>` : ''}</span>
                           </div>
                           ${(() => {
                             const seqPlan = (isMedicalSubjectCategory(cat) && tp.id === 'lesson')
@@ -25207,6 +25281,13 @@ ${plan.leftoverSurplusMin >= 15 ? `
       <button type="button" class="btn btn-outline" onclick="forcePushToFb()">⬆️ رفع الآن</button>
       <button type="button" class="btn btn-outline" onclick="closeFbSyncModal()">إغلاق</button>
     </div>
+    <div id="hbOtaBox" style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--border, rgba(148,163,184,0.35)); display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <div style="font-size:0.78rem; color:var(--muted,#6a7392);">
+        <div><strong>🚀 التحديث التلقائي (OTA)</strong></div>
+        <div id="hbOtaVersionLabel" style="font-size:0.73rem; margin-top:2px;">جاري فحص حالة الإصدار...</div>
+      </div>
+      <button type="button" id="hbOtaCheckBtn" class="btn btn-outline btn-sm" style="font-size:0.78rem; padding:6px 10px;" onclick="checkHabiticoOtaUpdate({ manual: true })">🔄 فحص التحديثات</button>
+    </div>
   </div>
 </div>
 
@@ -27200,6 +27281,203 @@ ${plan.leftoverSurplusMin >= 15 ? `
   document.body.classList.add('fox-hub-active');
   syncHubBadges();
   setTimeout(() => { syncHubBadges(); layoutSatellites(); }, 250);
+})();
+</script>
+
+
+<!-- Self-Hosted OTA Live Update Engine (Capacitor 6 + @capgo/capacitor-updater + GitHub Pages) -->
+<script>
+(function() {
+  const OTA_VERSION_URL = "https://salah007-1.github.io/Habitico/ota/version.json";
+  const OTA_HASH_KEY = "__habitico_ota_hash";
+  const OTA_VER_KEY = "__habitico_ota_version";
+  const OTA_LAST_CHECK_KEY = "__habitico_ota_last_check";
+  const MIN_CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+  let otaInFlight = false;
+
+  function getNativeUpdater() {
+    try {
+      if (window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform()) {
+        return (window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorUpdater) || null;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // CRITICAL: Confirm bundle boot immediately so Capgo never triggers a false rollback
+  (function bootNotifyReady() {
+    const updater = getNativeUpdater();
+    if (updater && typeof updater.notifyAppReady === "function") {
+      try {
+        Promise.resolve(updater.notifyAppReady()).catch(function() {});
+      } catch (e) {}
+    }
+  })();
+
+  function updateOtaUiLabel(customText) {
+    const lbl = document.getElementById("hbOtaVersionLabel");
+    if (!lbl) return;
+    if (customText) {
+      lbl.textContent = customText;
+      return;
+    }
+    const updater = getNativeUpdater();
+    const ver = localStorage.getItem(OTA_VER_KEY) || "النسخة المدمجة";
+    if (!updater) {
+      lbl.textContent = "نسخة المتصفح (تتحدث تلقائياً من الويب)";
+    } else {
+      lbl.textContent = "الإصدار المثبّت: " + ver;
+    }
+  }
+
+  async function resolveLocalOtaHash() {
+    const savedHash = localStorage.getItem(OTA_HASH_KEY);
+    if (savedHash) return savedHash;
+    try {
+      const res = await fetch("./ota-builtin-version.json", { cache: "no-store" });
+      if (res && res.ok) {
+        const meta = await res.json();
+        if (meta && meta.hash) {
+          localStorage.setItem(OTA_HASH_KEY, String(meta.hash));
+          if (meta.version) localStorage.setItem(OTA_VER_KEY, String(meta.version));
+          return String(meta.hash);
+        }
+      }
+    } catch (e) {}
+    return "";
+  }
+
+  async function cleanupOldOtaBundles(updater, keepId) {
+    try {
+      if (!updater || typeof updater.list !== "function" || typeof updater.delete !== "function") return;
+      const res = await updater.list();
+      const bundles = (res && Array.isArray(res.bundles)) ? res.bundles : [];
+      for (let i = 0; i < bundles.length; i++) {
+        const b = bundles[i];
+        if (b && b.id && b.id !== keepId && b.id !== "builtin") {
+          try { await updater.delete({ id: b.id }); } catch (e) {}
+        }
+      }
+    } catch (e) {}
+  }
+
+  window.checkHabiticoOtaUpdate = async function(opts) {
+    const manual = !!(opts && opts.manual);
+    const updater = getNativeUpdater();
+    const toast = (msg) => { if (typeof showAppToast === "function") showAppToast(msg); };
+
+    if (!updater) {
+      updateOtaUiLabel();
+      if (manual) toast("🌐 أنت فاتح نسخة المتصفح؛ التحديث الهوائي (OTA) يعمل تلقائياً داخل تطبيق الأندرويد (APK).");
+      return { status: "not_native" };
+    }
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      if (manual) toast("📡 أنت حالياً أوفلاين — سيتحقق التطبيق من التحديث تلقائياً فور عودة الإنترنت.");
+      return { status: "offline" };
+    }
+
+    if (otaInFlight) {
+      if (manual) toast("⏳ جاري فحص أو تنزيل التحديث حالياً...");
+      return { status: "busy" };
+    }
+
+    if (!manual) {
+      const lastTs = Number(localStorage.getItem(OTA_LAST_CHECK_KEY) || "0");
+      if (Date.now() - lastTs < MIN_CHECK_INTERVAL_MS) {
+        updateOtaUiLabel();
+        return { status: "throttled" };
+      }
+    }
+
+    otaInFlight = true;
+    const btn = document.getElementById("hbOtaCheckBtn");
+    if (btn && manual) { btn.disabled = true; btn.textContent = "⏳ جاري الفحص..."; }
+
+    try {
+      localStorage.setItem(OTA_LAST_CHECK_KEY, String(Date.now()));
+      const res = await fetch(OTA_VERSION_URL + "?t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) {
+        if (manual) toast("⚠️ تعذر الوصول لملف التحديث على GitHub (HTTP " + res.status + ").");
+        return { status: "http_error", code: res.status };
+      }
+      const remote = await res.json();
+      if (!remote || !remote.version || !remote.url) {
+        if (manual) toast("⚠️ ملف التحديث غير مكتمل.");
+        return { status: "invalid_manifest" };
+      }
+
+      const localHash = await resolveLocalOtaHash();
+      const localVer = localStorage.getItem(OTA_VER_KEY) || "";
+      const remoteHash = String(remote.hash || remote.version);
+      const isNewer = localHash ? (remoteHash !== localHash) : (String(remote.version) !== localVer);
+
+      if (!isNewer) {
+        updateOtaUiLabel("محدّث لآخر إصدار (" + remote.version + ")");
+        if (manual) toast("✅ التطبيق على أحدث إصدار بالفعل (" + remote.version + ").");
+        return { status: "up_to_date", version: remote.version };
+      }
+
+      updateOtaUiLabel("⬇️ جاري تنزيل الإصدار " + remote.version + "...");
+      toast("⬇️ يوجد تحديث جديد للتطبيق (" + remote.version + ") — جاري التنزيل في الخلفية...");
+
+      const bundleUrl = remote.url + (remote.url.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(remote.version);
+      const bundle = await updater.download({
+        url: bundleUrl,
+        version: String(remote.version)
+      });
+
+      if (!bundle || !bundle.id) {
+        throw new Error("Bundle download returned empty id");
+      }
+
+      // Persist state safely before switching bundle
+      try { if (typeof saveState === "function") saveState(); } catch (e) {}
+      localStorage.setItem(OTA_HASH_KEY, remoteHash);
+      localStorage.setItem(OTA_VER_KEY, String(remote.version));
+
+      await cleanupOldOtaBundles(updater, bundle.id);
+      updateOtaUiLabel("✨ جاري تطبيق الإصدار " + remote.version + "...");
+      toast("🚀 تم تنزيل التحديث بنجاح! جاري إعادة تشغيل التطبيق بالنسخة الجديدة...");
+
+      setTimeout(function() {
+        updater.set(bundle).catch(function(err) {
+          console.error("OTA set error:", err);
+        });
+      }, 600);
+
+      return { status: "updated", version: remote.version };
+    } catch (err) {
+      console.error("Habitico OTA update error:", err);
+      updateOtaUiLabel();
+      if (manual) toast("⚠️ تعذر تنزيل التحديث حالياً — بياناتك بأمان وحاول لاحقاً.");
+      return { status: "error", error: String(err && err.message || err) };
+    } finally {
+      otaInFlight = false;
+      if (btn && manual) { btn.disabled = false; btn.textContent = "🔄 فحص التحديثات"; }
+    }
+  };
+
+  // Refresh version label whenever sync modal opens
+  const origOpenFb = window.openFbSyncModal;
+  if (typeof origOpenFb === "function") {
+    window.openFbSyncModal = function() {
+      const r = origOpenFb.apply(this, arguments);
+      updateOtaUiLabel();
+      return r;
+    };
+  }
+
+  // Silent background check 4s after launch & when returning to foreground
+  window.addEventListener("load", function() {
+    updateOtaUiLabel();
+    setTimeout(function() { window.checkHabiticoOtaUpdate({ manual: false }); }, 4000);
+  });
+  document.addEventListener("visibilitychange", function() {
+    if (!document.hidden) {
+      setTimeout(function() { window.checkHabiticoOtaUpdate({ manual: false }); }, 1500);
+    }
+  });
 })();
 </script>
 

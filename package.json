@@ -1,12 +1,13 @@
 {
   "name": "habitico-app",
-  "version": "1.0.0",
-  "description": "Habitico Android APK via Capacitor & GitHub Actions",
+  "version": "1.1.0",
+  "description": "Habitico Android APK via Capacitor 6 with Self-Hosted OTA Live Updates",
   "private": true,
   "dependencies": {
     "@capacitor/android": "^6.1.2",
     "@capacitor/core": "^6.1.2",
-    "@capacitor/local-notifications": "^6.1.1"
+    "@capacitor/local-notifications": "^6.1.1",
+    "@capgo/capacitor-updater": "^6.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.1.2"
