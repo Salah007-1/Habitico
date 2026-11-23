@@ -106,18 +106,18 @@ jobs:
             echo "rebuild=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         if: steps.check_native.outputs.rebuild == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
-      - name: Setup Java 17
+      - name: Setup Java 21
         if: steps.check_native.outputs.rebuild == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Prepare web assets in www/ (with built-in OTA hash)
         if: steps.check_native.outputs.rebuild == 'true'
