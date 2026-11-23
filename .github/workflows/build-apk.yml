@@ -1,52 +1,158 @@
-name: Build Habitico Android APK
+name: Habitico OTA Live Update & Android APK
 
 on:
   push:
     branches: [ main ]
     paths:
       - 'index.html'
+      - 'sw.js'
+      - 'manifest.json'
       - 'icon.png'
       - 'capacitor.config.json'
       - 'package.json'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
-jobs:
-  build-android-apk:
-    runs-on: ubuntu-latest
+permissions:
+  contents: write
 
+jobs:
+  publish-ota-bundle:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Build OTA bundle.zip & version.json
+        run: |
+          python3 - << 'PY'
+          import hashlib, json, os, shutil, zipfile
+          from datetime import datetime, timezone
+
+          os.makedirs('ota', exist_ok=True)
+          os.makedirs('www_ota', exist_ok=True)
+
+          files = ['index.html', 'sw.js', 'manifest.json', 'icon.png']
+          for f in files:
+              if os.path.isfile(f):
+                  shutil.copy2(f, os.path.join('www_ota', f))
+
+          with open('index.html', 'rb') as fp:
+              h = hashlib.sha256(fp.read()).hexdigest()[:10]
+
+          now_utc = datetime.now(timezone.utc)
+          version = f"{now_utc.strftime('%Y%m%d')}-{h}"
+
+          # Embed builtin metadata inside bundle too
+          meta = {
+              "version": version,
+              "hash": h,
+              "url": "https://salah007-1.github.io/Habitico/ota/bundle.zip",
+              "updatedAt": now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+          }
+          with open(os.path.join('www_ota', 'ota-builtin-version.json'), 'w', encoding='utf-8') as fp:
+              json.dump(meta, fp, ensure_ascii=False, indent=2)
+
+          bundle_path = os.path.join('ota', 'bundle.zip')
+          with zipfile.ZipFile(bundle_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+              for fname in sorted(os.listdir('www_ota')):
+                  if fname.startswith('.'):
+                      continue
+                  full = os.path.join('www_ota', fname)
+                  if os.path.isfile(full):
+                      zf.write(full, fname)
+
+          with open(os.path.join('ota', 'version.json'), 'w', encoding='utf-8') as fp:
+              json.dump(meta, fp, ensure_ascii=False, indent=2)
+
+          print("Published OTA bundle:", version)
+          PY
+
+      - name: Commit & push OTA bundle to main (GitHub Pages)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ota/bundle.zip ota/version.json
+          if ! git diff --cached --quiet; then
+            VER=$(python3 -c "import json; print(json.load(open('ota/version.json'))['version'])")
+            git commit -m "chore(ota): publish live bundle ${VER} [skip ci]"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          else
+            echo "No OTA bundle changes to commit."
+          fi
+
+  build-android-apk:
+    runs-on: ubuntu-latest
+    # Build APK automatically when native files change OR on manual trigger (saves Actions minutes on HTML-only pushes!)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if native APK rebuild is needed
+        id: check_native
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "rebuild=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "package.json")
+          echo "Changed files: $CHANGED"
+          if echo "$CHANGED" | grep -Eq '^(package\.json|capacitor\.config\.json|icon\.png|\.github/workflows/build-apk\.yml)$'; then
+            echo "rebuild=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rebuild=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Node.js 20
+        if: steps.check_native.outputs.rebuild == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Setup Java 17
+        if: steps.check_native.outputs.rebuild == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Prepare web assets in www/
+      - name: Prepare web assets in www/ (with built-in OTA hash)
+        if: steps.check_native.outputs.rebuild == 'true'
         run: |
           mkdir -p www
           cp index.html www/index.html
           [ -f manifest.json ] && cp manifest.json www/manifest.json || true
           [ -f icon.png ] && cp icon.png www/icon.png || true
           [ -f sw.js ] && cp sw.js www/sw.js || true
+          python3 - << 'PY'
+          import hashlib, json
+          from datetime import datetime, timezone
+          with open('index.html', 'rb') as fp:
+              h = hashlib.sha256(fp.read()).hexdigest()[:10]
+          now_utc = datetime.now(timezone.utc)
+          meta = {
+              "version": f"{now_utc.strftime('%Y%m%d')}-{h}",
+              "hash": h
+          }
+          with open('www/ota-builtin-version.json', 'w', encoding='utf-8') as fp:
+              json.dump(meta, fp, ensure_ascii=False, indent=2)
+          PY
 
       - name: Install Capacitor dependencies
+        if: steps.check_native.outputs.rebuild == 'true'
         run: npm install --no-audit --no-fund
 
       - name: Add Android platform & sync plugins
+        if: steps.check_native.outputs.rebuild == 'true'
         run: |
           npx cap add android
           npx cap sync android
 
       - name: Configure Android permissions (Notifications & Exact Alarms)
+        if: steps.check_native.outputs.rebuild == 'true'
         run: |
           python3 - << 'PY'
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
@@ -74,39 +180,27 @@ jobs:
           print('Manifest updated successfully')
           PY
 
-      - name: Apply Habitico App Icon & Fox Notification Icon
+      - name: Apply Habitico App Icon from icon.png
+        if: steps.check_native.outputs.rebuild == 'true'
         run: |
-          rm -rf android/app/src/main/res/mipmap-anydpi-v26
           if [ -f icon.png ]; then
-            declare -A SIZES=( [mipmap-mdpi]=48 [mipmap-hdpi]=72 [mipmap-xhdpi]=96 [mipmap-xxhdpi]=144 [mipmap-xxxhdpi]=192 )
-            for dir in "${!SIZES[@]}"; do
-              sz="${SIZES[$dir]}"
+            for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
               mkdir -p "android/app/src/main/res/$dir"
-              convert icon.png -resize "${sz}x${sz}!" "android/app/src/main/res/$dir/ic_launcher.png" 2>/dev/null || cp icon.png "android/app/src/main/res/$dir/ic_launcher.png"
-              convert icon.png -resize "${sz}x${sz}!" "android/app/src/main/res/$dir/ic_launcher_round.png" 2>/dev/null || cp icon.png "android/app/src/main/res/$dir/ic_launcher_round.png"
+              cp icon.png "android/app/src/main/res/$dir/ic_launcher.png"
+              cp icon.png "android/app/src/main/res/$dir/ic_launcher_round.png"
+              cp icon.png "android/app/src/main/res/$dir/ic_launcher_foreground.png"
             done
           fi
-          mkdir -p android/app/src/main/res/drawable
-          cat << 'XML' > android/app/src/main/res/drawable/ic_stat_habitico.xml
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="24dp"
-              android:height="24dp"
-              android:viewportWidth="24"
-              android:viewportHeight="24">
-            <path
-                android:fillColor="#FFFFFF"
-                android:fillType="evenOdd"
-                android:pathData="M3.5,3 L9.2,7.6 Q12,6.8 14.8,7.6 L20.5,3 L21.5,11.8 L12,21.5 L2.5,11.8 Z M7.2,12.2 L10.3,13.4 L8.4,14.6 Z M16.8,12.2 L13.7,13.4 L15.6,14.6 Z" />
-          </vector>
-          XML
 
       - name: Build Android APK
+        if: steps.check_native.outputs.rebuild == 'true'
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
       - name: Rename & Upload Habitico APK
+        if: steps.check_native.outputs.rebuild == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: Habitico-APK
