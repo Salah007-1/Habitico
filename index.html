@@ -20472,27 +20472,108 @@ textarea:focus {
       return { overlapMinutes: totalOverlap, matchedObligations: matched };
     }
 
-    function tbGetDayAvailabilityBreakdown(ymdStr) {
+    function tbGetIntervalsObligationOverlapMinutes(ymdStr, intervals) {
+      if (!Array.isArray(intervals) || intervals.length === 0) return 0;
+      const activeObs = getActiveTbObligationsForDate(ymdStr);
+      if (activeObs.length === 0) return 0;
+      const covered = new Uint8Array(1440);
+      activeObs.forEach(ob => {
+        const obIntervals = tbTimeRangeToIntervals(ob.startTime, ob.endTime);
+        intervals.forEach(([bs, be]) => {
+          obIntervals.forEach(([os, oe]) => {
+            const st = Math.max(bs, os);
+            const en = Math.min(be, oe);
+            if (en > st) {
+              for (let m = st; m < en; m++) covered[m] = 1;
+            }
+          });
+        });
+      });
+      let ov = 0;
+      for (let i = 0; i < 1440; i++) if (covered[i]) ov++;
+      return ov;
+    }
+
+    function tbGetDayAvailabilityBreakdown(ymdStr, opts = null) {
       ensureTimeBlockingState();
       ensureTbObligationsState();
       const blocks = state.timeBlocking.blocks || [];
+      const sysToday = getSystemTodayYMD();
+      const applyTodayCutoff = !!(opts && opts.applyTodayCutoff && ymdStr === sysToday);
+      const todayMode = (opts && opts.todayBlockMode === 'remaining_current') ? 'remaining_current' : 'next_block';
+      const nowObj = new Date();
+      const nowMin = nowObj.getHours() * 60 + nowObj.getMinutes();
+
       let rawMinutes = 0;
       let obligationOverlapMinutes = 0;
       let net75Minutes = 0;
       let buffer25Minutes = 0;
+      let fullDayNet75Minutes = 0;
+      let currentBlockName = null;
+      let currentBlockRemainNet75 = 0;
+      let upcomingBlocksCount = 0;
+
       blocks.forEach(b => {
         const bDur = tbCalcBlockDurationMin(b.startTime, b.endTime);
-        const ov = Math.min(bDur, tbGetBlockObligationOverlapInfo(ymdStr, b).overlapMinutes);
-        const bAfterOb = Math.max(0, bDur - ov);
-        const b75 = Math.round(bAfterOb * 0.75);
-        const bBuf25 = Math.max(0, bAfterOb - b75);
-        rawMinutes += bDur;
-        obligationOverlapMinutes += ov;
-        net75Minutes += b75;
-        buffer25Minutes += bBuf25;
+        const fullOv = Math.min(bDur, tbGetBlockObligationOverlapInfo(ymdStr, b).overlapMinutes);
+        const fullAfterOb = Math.max(0, bDur - fullOv);
+        fullDayNet75Minutes += Math.round(fullAfterOb * 0.75);
+
+        if (!applyTodayCutoff) {
+          const b75 = Math.round(fullAfterOb * 0.75);
+          const bBuf25 = Math.max(0, fullAfterOb - b75);
+          rawMinutes += bDur;
+          obligationOverlapMinutes += fullOv;
+          net75Minutes += b75;
+          buffer25Minutes += bBuf25;
+          upcomingBlocksCount++;
+          return;
+        }
+
+        const sMin = tbParseTimeToMinutes(b.startTime);
+        const eMin = tbParseTimeToMinutes(b.endTime);
+        const isOvernight = eMin < sMin;
+        const isEnded = !isOvernight && (nowMin >= eMin);
+        const isCurrent = isOvernight ? (nowMin >= sMin) : (nowMin >= sMin && nowMin < eMin);
+        const isUpcoming = !isEnded && !isCurrent && (sMin > nowMin);
+
+        if (isEnded) return;
+
+        if (isCurrent) {
+          currentBlockName = b.name || 'البلوك الحالي';
+          const remIntervals = isOvernight ? [[nowMin, 1440], [0, eMin]] : [[nowMin, eMin]];
+          const remRaw = remIntervals.reduce((acc, [a, c]) => acc + Math.max(0, c - a), 0);
+          const remOv = Math.min(remRaw, tbGetIntervalsObligationOverlapMinutes(ymdStr, remIntervals));
+          const remAfterOb = Math.max(0, remRaw - remOv);
+          const rem75 = Math.round(remAfterOb * 0.75);
+          currentBlockRemainNet75 = rem75;
+
+          if (todayMode === 'remaining_current' && remRaw > 0) {
+            rawMinutes += remRaw;
+            obligationOverlapMinutes += remOv;
+            net75Minutes += rem75;
+            buffer25Minutes += Math.max(0, remAfterOb - rem75);
+          }
+          return;
+        }
+
+        if (isUpcoming) {
+          const b75 = Math.round(fullAfterOb * 0.75);
+          const bBuf25 = Math.max(0, fullAfterOb - b75);
+          rawMinutes += bDur;
+          obligationOverlapMinutes += fullOv;
+          net75Minutes += b75;
+          buffer25Minutes += bBuf25;
+          upcomingBlocksCount++;
+        }
       });
+
       const netMinutes = Math.max(0, rawMinutes - obligationOverlapMinutes);
       const net85Minutes = Math.round(netMinutes * 0.85);
+      const todayRemainingRatio = (applyTodayCutoff && fullDayNet75Minutes > 0)
+        ? Math.max(0, Math.min(1, net75Minutes / fullDayNet75Minutes))
+        : 1;
+
       return {
         ymd: ymdStr,
         rawMinutes,
@@ -20501,33 +20582,50 @@ textarea:focus {
         buffer25Minutes,
         net75Minutes,
         net85Minutes,
+        fullDayNet75Minutes,
+        applyTodayCutoff,
+        todayBlockMode: todayMode,
+        todayRemainingRatio,
+        currentBlockName,
+        currentBlockRemainNet75,
+        upcomingBlocksCount,
         activeObligations: getActiveTbObligationsForDate(ymdStr)
       };
     }
 
-    function tbGetWeekAvailabilityBreakdown(weekSundayYMD, fromDateYMD = null, excludedDayOffsets = null) {
+    function tbGetWeekAvailabilityBreakdown(weekSundayYMD, fromDateYMD = null, excludedDayOffsets = null, opts = null) {
       const startDay = fromDateYMD && fromDateYMD > weekSundayYMD ? fromDateYMD : weekSundayYMD;
       const satYMD = addDays(weekSundayYMD, 6);
+      const sysToday = getSystemTodayYMD();
+      const applyTodayCutoff = !!(opts && opts.applyTodayCutoff);
+      const todayBlockMode = (opts && opts.todayBlockMode === 'remaining_current') ? 'remaining_current' : 'next_block';
       const offSet = new Set(Array.isArray(excludedDayOffsets) ? excludedDayOffsets.map(Number) : []);
       let rawWeekMin = 0;
       let obWeekMin = 0;
       let netWeekMin = 0;
       let buffer25WeekMin = 0;
       let netWeek75Min = 0;
+      let effectiveManualDaysWeight = 0;
+      let todayInfo = null;
       const dayBreakdowns = [];
       const allDayBreakdowns = [];
       for (let d = startDay; diffDays(d, satYMD) >= 0; d = addDays(d, 1)) {
         const dayIdx = diffDays(weekSundayYMD, d);
-        const info = tbGetDayAvailabilityBreakdown(d);
+        const isPastDay = applyTodayCutoff && d < sysToday;
+        const info = isPastDay
+          ? { ymd: d, rawMinutes: 0, obligationOverlapMinutes: 0, netMinutes: 0, buffer25Minutes: 0, net75Minutes: 0, net85Minutes: 0, fullDayNet75Minutes: 0, applyTodayCutoff: true, todayBlockMode, todayRemainingRatio: 0, currentBlockName: null, currentBlockRemainNet75: 0, upcomingBlocksCount: 0, activeObligations: [] }
+          : tbGetDayAvailabilityBreakdown(d, applyTodayCutoff ? { applyTodayCutoff: true, todayBlockMode } : null);
+        if (d === sysToday) todayInfo = info;
         const isOff = offSet.has(dayIdx);
-        const enriched = Object.assign({}, info, { dayIdx, isOff });
+        const enriched = Object.assign({}, info, { dayIdx, isOff, isPastDay });
         allDayBreakdowns.push(enriched);
-        if (!isOff) {
+        if (!isOff && !isPastDay) {
           rawWeekMin += info.rawMinutes;
           obWeekMin += info.obligationOverlapMinutes;
           netWeekMin += info.netMinutes;
           buffer25WeekMin += info.buffer25Minutes;
           netWeek75Min += info.net75Minutes;
+          effectiveManualDaysWeight += (d === sysToday && applyTodayCutoff) ? info.todayRemainingRatio : 1;
           dayBreakdowns.push(enriched);
         }
       }
@@ -20536,8 +20634,10 @@ textarea:focus {
         fromDate: startDay,
         toDate: satYMD,
         daysCount: dayBreakdowns.length,
+        effectiveManualDaysWeight,
+        todayInfo,
         totalRangeDaysCount: allDayBreakdowns.length,
-        offDaysInWindowCount: allDayBreakdowns.length - dayBreakdowns.length,
+        offDaysInWindowCount: allDayBreakdowns.filter(x => x.isOff).length,
         rawWeekMinutes: rawWeekMin,
         obligationOverlapMinutes: obWeekMin,
         netWeekMinutes: netWeekMin,
@@ -21712,8 +21812,21 @@ textarea:focus {
 
     // [إضافة] مهام الأسبوع التي تستهلك من ميزانية الفترة المختارة فعلاً:
     // إذا بدأت الخطة من منتصف الأسبوع، فالمهام التي أُنجزت قبل يوم البداية لا تُحسب ضد الوقت المتبقي (وإلا يظهر عجز وهمي).
+    function estimateSingleTaskRemainingMinutes(taskObj, benchMap) {
+      if (!taskObj || taskObj.done) return 0;
+      const full = estimateSingleTaskFullMinutes(taskObj, benchMap);
+      const frac = (typeof taskCompletionFraction === 'function') ? taskCompletionFraction(taskObj) : 0;
+      return Math.max(0, Math.round(full * (1 - Math.max(0, Math.min(1, frac)))));
+    }
+
     function filterTasksInsidePlanWindow(tasks, weekSundayYMD, planStartYMD) {
       const list = Array.isArray(tasks) ? tasks : [];
+      const sysToday = getSystemTodayYMD();
+      const curSun = getWeekSundayYMD(sysToday);
+      // في الأسبوع الحالي (أو عند التخطيط من اليوم فصاعداً): المهام المنجزة بالفعل لا تستهلك من الساعات المتبقية أبداً
+      if (weekSundayYMD === curSun || (planStartYMD && planStartYMD >= sysToday)) {
+        return list.filter(t => t && !t.done);
+      }
       if (!planStartYMD || !weekSundayYMD || planStartYMD <= weekSundayYMD) return list;
       return list.filter(t => !(t && t.done && t.completedAt && t.completedAt < planStartYMD));
     }
@@ -21766,16 +21879,33 @@ textarea:focus {
       }
     }
 
+    function setAdvisorTodayBlockMode(mode) {
+      const cfg = ensurePlanningAnalyticsConfig();
+      cfg.advisorTodayBlockMode = (mode === 'remaining_current') ? 'remaining_current' : 'next_block';
+      saveState();
+      renderWeeklyPlanAdvisorModalBody();
+      renderAdvisorStudioPage();
+      renderStudyTasksView();
+    }
+
     function computeWeekNetStudyBudget(weekSundayYMD, fromDateYMD = null) {
       const cfg = ensurePlanningAnalyticsConfig();
       const quotas = ensureWeeklyFixedQuotas();
       const offDays = getAdvisorOffDaysForWeek(weekSundayYMD);
-      const tbWeek = tbGetWeekAvailabilityBreakdown(weekSundayYMD, fromDateYMD, offDays);
-      const daysRatio = tbWeek.daysCount / 7;
+      const sysToday = getSystemTodayYMD();
+      const curSun = getWeekSundayYMD(sysToday);
+      const isCurrentWeek = (weekSundayYMD === curSun);
+      const todayBlockMode = (cfg.advisorTodayBlockMode === 'remaining_current') ? 'remaining_current' : 'next_block';
+
+      const tbWeek = tbGetWeekAvailabilityBreakdown(weekSundayYMD, fromDateYMD, offDays, {
+        applyTodayCutoff: isCurrentWeek,
+        todayBlockMode
+      });
 
       const isManual = cfg.advisorHoursSource === 'manual';
+      const manualDaysEff = (typeof tbWeek.effectiveManualDaysWeight === 'number') ? tbWeek.effectiveManualDaysWeight : tbWeek.daysCount;
       const rawSourceMin = isManual
-        ? Math.round((Number(cfg.advisorManualDailyHours) || 6) * 60 * tbWeek.daysCount)
+        ? Math.round((Number(cfg.advisorManualDailyHours) || 6) * 60 * manualDaysEff)
         : tbWeek.netWeek75Minutes;
 
       // إجمالي طاقة القراية الصافية للفترة (100% من المؤشر شاملة الحصص الثابتة والمهام الدراسية)
@@ -21783,20 +21913,17 @@ textarea:focus {
         ? (cfg.advisorBuffer15 !== false ? Math.round(rawSourceMin * 0.85) : rawSourceMin)
         : rawSourceMin;
 
-      // إجمالي الحصص الأسبوعية الثابتة للفترة المختارة (بحسب الأيام النشطة فعلياً دون أيام الـ Off)
-      let fullPeriodQuotasMin = 0;
+      // حساب المتبقي الفعلي من الحصص الأسبوعية الثابتة (الهدف الأسبوعي الصافي − ما تم إنجازه بالفعل هذا الأسبوع)
+      let fullWeekQuotasMin = 0;
+      let loggedWeekQuotasMin = 0;
       let remainingQuotasMin = 0;
       quotas.forEach(q => {
         const fullQTarget = getWeeklyQuotaNetTargetMinutes(q);
-        const scaledForDays = Math.round(fullQTarget * daysRatio);
-        fullPeriodQuotasMin += scaledForDays;
+        fullWeekQuotasMin += fullQTarget;
         const alreadyLogged = getWeeklyQuotaLoggedMinutes(q, weekSundayYMD);
+        loggedWeekQuotasMin += Math.min(fullQTarget, alreadyLogged);
         const unloggedWeekQuota = Math.max(0, fullQTarget - alreadyLogged);
-        if ((fromDateYMD && fromDateYMD > weekSundayYMD) || offDays.length > 0) {
-          remainingQuotasMin += Math.min(unloggedWeekQuota, scaledForDays);
-        } else {
-          remainingQuotasMin += scaledForDays;
-        }
+        remainingQuotasMin += unloggedWeekQuota;
       });
 
       const quotasDeductMin = (cfg.advisorIncludeQuotas !== false && tbWeek.daysCount > 0) ? remainingQuotasMin : 0;
@@ -21817,10 +21944,12 @@ textarea:focus {
         plannableForTasksMin,
         offDays,
         tbWeek,
+        todayBlockMode,
         isManual,
         rawSourceMin,
         afterBufferMin,
-        fullPeriodQuotasMin,
+        fullPeriodQuotasMin: fullWeekQuotasMin,
+        loggedWeekQuotasMin,
         quotasDeductMin,
         netForTasksMin
       };
@@ -22803,10 +22932,10 @@ textarea:focus {
       // 1) المهام في التصنيفات غير المختارة تُطرح من الوعاء العام
       // 2) المهام في التصنيفات المختارة تُخصم من نصيب نفس التصنيف/النوع حتى لا تتشوه نسب التصنيفات الأخرى عند إضافة جزء من الخطة!
       const existingWeekTasks = filterTasksInsidePlanWindow((state.studyTasks || []).filter(t => t && t.weekSunday === targetSun && !(['st_1', 'st_2', 'st_3', 'st_4'].includes(t.id) && !t.done)), targetSun, planStartDateYMD);
-      const alreadyPlannedAllMin = existingWeekTasks.reduce((acc, t) => acc + estimateSingleTaskFullMinutes(t, bench.categories), 0);
+      const alreadyPlannedAllMin = existingWeekTasks.reduce((acc, t) => acc + estimateSingleTaskRemainingMinutes(t, bench.categories), 0);
       const unselectedCatsTasksMin = existingWeekTasks
         .filter(t => !selectedCats.includes(t.category || 'عام'))
-        .reduce((acc, t) => acc + estimateSingleTaskFullMinutes(t, bench.categories), 0);
+        .reduce((acc, t) => acc + estimateSingleTaskRemainingMinutes(t, bench.categories), 0);
 
       const subtractExisting = cfg.advisorSubtractExistingTasks !== false;
       const poolForSelectedCatsMin = subtractExisting
@@ -23003,6 +23132,22 @@ ${plan.leftoverSurplusMin >= 15 ? `
               <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
                 ${weekDaysPickerHtml}
               </div>
+              ${(!isNext && budget.tbWeek.todayInfo && planStartDateYMD <= sysToday) ? `
+                <div style="background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:8px 11px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                  <div style="font-size:0.76rem; font-weight:800; color:var(--text);">
+                    ⏱️ حساب ساعات <strong>اليوم</strong>:
+                    ${budget.tbWeek.todayInfo.currentBlockName
+                      ? `<span class="hint" style="font-weight:700;">(البلوك الحالي «${hbEsc(budget.tbWeek.todayInfo.currentBlockName)}» متبقٍ منه ${fmtMinutesAr(budget.tbWeek.todayInfo.currentBlockRemainNet75)} صافي)</span>`
+                      : (budget.tbWeek.todayInfo.upcomingBlocksCount > 0
+                        ? `<span class="hint" style="font-weight:700;">(متبقي ${budget.tbWeek.todayInfo.upcomingBlocksCount} بلوكات قادمة اليوم)</span>`
+                        : `<span class="hint" style="font-weight:700; color:var(--amber-ink);">(انتهت كل بلوكات اليوم — المتبقي 0 د)</span>`)}
+                  </div>
+                  <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-sm ${budget.todayBlockMode !== 'remaining_current' ? 'btn-primary' : 'btn-outline'}" style="padding:3px 9px; font-size:0.72rem;" onclick="setAdvisorTodayBlockMode('next_block')">⏭️ من البلوك القادم فقط</button>
+                    <button type="button" class="btn btn-sm ${budget.todayBlockMode === 'remaining_current' ? 'btn-primary' : 'btn-outline'}" style="padding:3px 9px; font-size:0.72rem;" onclick="setAdvisorTodayBlockMode('remaining_current')">⏱️ احتساب المتبقي من البلوك الحالي</button>
+                  </div>
+                </div>
+              ` : ''}
 
               <div style="padding-top:8px; border-top:1px dotted var(--border);">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
@@ -23038,7 +23183,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
             <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
               <label style="display:inline-flex; align-items:center; gap:6px; font-size:0.79rem; font-weight:800; cursor:pointer;">
                 <input type="checkbox" ${cfg.advisorIncludeQuotas !== false ? 'checked' : ''} onchange="toggleAdvisorIncludeQuotas(this.checked)" style="width:16px; height:16px;" />
-                <span>🟫 خصم الحصص الأسبوعية الثابتة (−${fmtMinutesAr(budget.quotasDeductMin)} = ${qPctInAdv}% من الطاقة)</span>
+                <span>🟫 خصم المتبقي من الحصص الأسبوعية الثابتة (−${fmtMinutesAr(budget.quotasDeductMin)} = ${qPctInAdv}% من الطاقة${budget.loggedWeekQuotasMin > 0 ? ` • أُنجز منها ${fmtMinutesAr(budget.loggedWeekQuotasMin)} من أصل ${fmtMinutesAr(budget.fullPeriodQuotasMin)}` : ''})</span>
               </label>
               <label style="display:inline-flex; align-items:center; gap:6px; font-size:0.79rem; font-weight:800; cursor:pointer;">
                 <input type="checkbox" ${subtractExisting ? 'checked' : ''} onchange="toggleAdvisorSubtractExistingTasks(this.checked)" style="width:16px; height:16px;" />
