@@ -1,4 +1,4 @@
-const CACHE_NAME = 'habitico-offline-v3';
+const CACHE_NAME = 'habitico-offline-v9';
 const APP_SHELL = [
   './',
   './index.html',
