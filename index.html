@@ -27973,7 +27973,10 @@ ${plan.leftoverSurplusMin >= 15 ? `
 <!-- Self-Hosted OTA Live Update Engine (Capacitor 6 + @capgo/capacitor-updater + GitHub Pages) -->
 <script>
 (function() {
-  const OTA_VERSION_URL = "https://salah007-1.github.io/Habitico/ota/version.json";
+  const OTA_VERSION_URLS = [
+    "https://raw.githubusercontent.com/Salah007-1/Habitico/main/ota/version.json",
+    "https://salah007-1.github.io/Habitico/ota/version.json"
+  ];
   const OTA_HASH_KEY = "__habitico_ota_hash";
   const OTA_VER_KEY = "__habitico_ota_version";
   const OTA_LAST_CHECK_KEY = "__habitico_ota_last_check";
@@ -28081,12 +28084,23 @@ ${plan.leftoverSurplusMin >= 15 ? `
 
     try {
       localStorage.setItem(OTA_LAST_CHECK_KEY, String(Date.now()));
-      const res = await fetch(OTA_VERSION_URL + "?t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) {
-        if (manual) toast("⚠️ تعذر الوصول لملف التحديث على GitHub (HTTP " + res.status + ").");
-        return { status: "http_error", code: res.status };
+      let remote = null;
+      let lastHttpCode = 0;
+      for (let uIdx = 0; uIdx < OTA_VERSION_URLS.length; uIdx++) {
+        try {
+          const r = await fetch(OTA_VERSION_URLS[uIdx] + "?t=" + Date.now(), { cache: "no-store" });
+          if (r && r.ok) {
+            remote = await r.json();
+            if (remote && remote.version && remote.url) break;
+          } else if (r) {
+            lastHttpCode = r.status;
+          }
+        } catch (e) {}
       }
-      const remote = await res.json();
+      if (!remote) {
+        if (manual) toast("⚠️ تعذر الوصول لملف التحديث على GitHub (HTTP " + (lastHttpCode || "net") + ").");
+        return { status: "http_error", code: lastHttpCode };
+      }
       if (!remote || !remote.version || !remote.url) {
         if (manual) toast("⚠️ ملف التحديث غير مكتمل.");
         return { status: "invalid_manifest" };
@@ -28106,10 +28120,26 @@ ${plan.leftoverSurplusMin >= 15 ? `
       updateOtaUiLabel("⬇️ جاري تنزيل الإصدار " + remote.version + "...");
       toast("⬇️ يوجد تحديث جديد للتطبيق (" + remote.version + ") — جاري التنزيل في الخلفية...");
 
-      const bundle = await updater.download({
-        url: String(remote.url),
-        version: String(remote.version)
-      });
+      const candidateUrls = [String(remote.url)];
+      if (remote.fallbackUrl && String(remote.fallbackUrl) !== String(remote.url)) {
+        candidateUrls.push(String(remote.fallbackUrl));
+      }
+      let bundle = null;
+      let lastDlErr = null;
+      for (let cIdx = 0; cIdx < candidateUrls.length; cIdx++) {
+        try {
+          bundle = await updater.download({
+            url: candidateUrls[cIdx],
+            version: String(remote.version)
+          });
+          if (bundle && bundle.id) break;
+        } catch (dlErr) {
+          lastDlErr = dlErr;
+        }
+      }
+      if (!bundle || !bundle.id) {
+        throw lastDlErr || new Error("Bundle download returned empty id");
+      }
 
       if (!bundle || !bundle.id) {
         throw new Error("Bundle download returned empty id");
@@ -28125,7 +28155,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
       toast("🚀 تم تنزيل التحديث بنجاح! جاري إعادة تشغيل التطبيق بالنسخة الجديدة...");
 
       setTimeout(function() {
-        updater.set(bundle).catch(function(err) {
+        updater.set({ id: bundle.id }).catch(function(err) {
           console.error("OTA set error:", err);
         });
       }, 600);
