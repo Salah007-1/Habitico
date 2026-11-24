@@ -6132,8 +6132,8 @@ textarea:focus {
             <div style="display:flex; flex-direction:column; gap:10px;">
               <input type="text" id="newHabitV2TitleInput" placeholder="اسم العادة (مثال: الصلوات الخمس في المسجد، قيام الليل)..." />
               <select id="newHabitV2TierSelect" style="width:100%;">
-                <option value="must">🛡️ مهما كان اليوم (MUST) — HP ×1.25 • XP ×1.5 • Jackpot ×1.2</option>
-                <option value="elevation">✨ العلو في منازل الجنة ومراتبها — HP ×0.45 • XP ×1 • Jackpot ×0.7</option>
+                <option value="must">🛡️ مهما كان اليوم (MUST) — HP ×1.25 • XP ×1.5 • Jackpot 15%</option>
+                <option value="elevation">✨ العلو في منازل الجنة ومراتبها — HP ×0.45 • XP ×1 • Jackpot 5%</option>
               </select>
               <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                 <select id="newHabitV2StarsSelect" style="flex:1; min-width:160px;">
@@ -9046,21 +9046,22 @@ textarea:focus {
       if (uniqueKey) mj.rolledKeys[uniqueKey] = true;
       if (isMicro) { const mc = (mj.microRolls[sysToday] || 0) + 1; mj.microRolls = {}; mj.microRolls[sysToday] = mc; }
 
-      let weightFactor = 0.80; // مهمة دراسية (وخطواتها) + الحصص الأسبوعية الثابتة (quota_daily & quota_weekly)
-      const safeTierMult = (typeof tierMult === 'number' && tierMult > 0) ? tierMult : 1.0;
-      if (sourceType === 'habit_v2') weightFactor = 0.15 * safeTierMult;
-      else if (sourceType === 'circular') weightFactor = 0.05;
+      let weightFactor = 0.75; // 75% للمهام الأسبوعية + الحصص الأسبوعية الثابتة
+      const habitDirectWeight = (typeof tierMult === 'number' && tierMult > 0) ? tierMult : 0.15;
+      if (sourceType === 'habit_v2') weightFactor = habitDirectWeight; // 15% (0.15) لـ MUST و 5% (0.05) للعلو في منازل الجنة
+      else if (sourceType === 'circular') weightFactor = 0.05; // 5% للمتتبع الدائري
 
       const starMultiplier = { 1: 0.5, 2: 1.0, 3: 2.2, 4: 4.2 }[stars || 1] || 1.0;
       const monthMultiplier = getMonthsSinceStart() === 1 ? 1.35 : (getMonthsSinceStart() === 2 ? 1.15 : 1.0);
 
-      // عداد حماية الجفاف المتتالي (Anti-Drought Pity Escalator) — موزّع نسبياً حسب وزن المصدر حتى لا تسرق العادات الصغيرة رصيد مهام المذاكرة
-      const weightRatio = weightFactor / 0.80;
+      // عداد حماية الجفاف المتتالي (Anti-Drought Pity Escalator) — موزّع نسبياً حسب وزن المصدر (المرجع 75%)
+      const weightRatio = weightFactor / 0.75;
       const droughtBonus = Math.min(0.20, (mj.droughtStreak || 0) * 0.015);
       const effectiveDroughtBonus = droughtBonus * weightRatio;
       const baseRollChance = 0.08;
+      const microScale = habitDirectWeight / 0.15; // 1.0 لـ MUST و 0.333 للعلو في منازل الجنة
       const finalChance = isMicro
-        ? Math.min(0.02, 0.0015 * safeTierMult * (starMultiplier / 4.2) * monthMultiplier)   // رمية صغيرة جداً لكل خطوة (بلا مكافأة جفاف)
+        ? Math.min(0.02, 0.0015 * microScale * (starMultiplier / 4.2) * monthMultiplier)   // رمية صغيرة جداً لكل خطوة (بلا مكافأة جفاف)
         : (isSplit
           ? 1 - Math.pow(1 - Math.min(0.75, (baseRollChance * weightFactor * starMultiplier * monthMultiplier) + effectiveDroughtBonus), 1 / splitN)   // حصة الخطوة بحيث يساوي مجموع خطواتها احتمال المهمة كاملة
           : Math.min(0.75, (baseRollChance * weightFactor * starMultiplier * monthMultiplier) + effectiveDroughtBonus));
@@ -9270,7 +9271,8 @@ textarea:focus {
       return getHabitV2Tier(h) === 'elevation' ? 15 : 22;
     }
     function getHabitTierJackpotMultiplier(h) {
-      return getHabitV2Tier(h) === 'elevation' ? 0.7 : 1.2;
+      // وزن الجاكبوت المباشر: 15% (0.15) لـ MUST و 5% (0.05) للعلو في منازل الجنة (ومجموع المصادر = 75% + 15% + 5% + 5% = 100%)
+      return getHabitV2Tier(h) === 'elevation' ? 0.05 : 0.15;
     }
     function getHabitEffectiveHpRate(h, ymd) {
       const baseRate = getDeductionRatesForStage(getStageForDate(ymd))[(h && h.stars) || 4] || 7;
@@ -11718,8 +11720,8 @@ textarea:focus {
       }
       if (listSubhint) {
         listSubhint.textContent = isElev
-          ? `النوافل ورفع الدرجات — خصم مخفّف متدرج (-${tierRates[4]} HP للملحمية) • 15 XP • وزن جاكبوت 0.7×`
-          : `الأساسيات غير القابلة للتفاوض — خصم حازم متدرج (-${tierRates[4]} HP للملحمية) • 22 XP • وزن جاكبوت 1.2×`;
+          ? `النوافل ورفع الدرجات — خصم مخفّف متدرج (-${tierRates[4]} HP للملحمية) • 15 XP • وزن جاكبوت 5%`
+          : `الأساسيات غير القابلة للتفاوض — خصم حازم متدرج (-${tierRates[4]} HP للملحمية) • 22 XP • وزن جاكبوت 15%`;
       }
 
       if (tierHeaderBox) {
@@ -11739,7 +11741,7 @@ textarea:focus {
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
                 <span class="chip" style="font-size:0.72rem;">HP ${isElev ? '×0.45' : '×1.25'}</span>
                 <span class="chip" style="font-size:0.72rem;">XP ${isElev ? '15' : '22'}</span>
-                <span class="chip" style="font-size:0.72rem;">🎁 ${isElev ? '×0.7' : '×1.2'}</span>
+                <span class="chip" style="font-size:0.72rem;">🎁 ${isElev ? '5%' : '15%'}</span>
               </div>
             </div>
             <div style="height:8px; border-radius:999px; background:rgba(148,163,184,0.2); overflow:hidden; margin-top:10px;">
@@ -25525,8 +25527,49 @@ ${plan.leftoverSurplusMin >= 15 ? `
       <button type="button" id="badgeModalNextBtn" class="btn btn-primary" style="width:100%; font-weight:900; padding:10px;" onclick="closeBadgeUnlockModal()">✨ رائع! متابعة</button>
     </div>
   </div>
-<!-- ==================== Firebase Real-Time Sync Engine ==================== -->
+<!-- ==================== Firebase Manual Sync & Backup History Engine ==================== -->
 <style>
+  #fbUnsyncedTopBadge {
+    display: none;
+    position: fixed;
+    top: 10px;
+    left: 12px;
+    z-index: 9760;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: #ffffff;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45);
+    align-items: center;
+    gap: 7px;
+    direction: rtl;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  #fbUnsyncedTopBadge.visible {
+    display: inline-flex;
+  }
+  #fbUnsyncedTopBadge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.6);
+  }
+  .fb-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fbbf24;
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.8);
+    animation: fbPulseAnim 1.6s infinite;
+    flex-shrink: 0;
+  }
+  @keyframes fbPulseAnim {
+    0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.75); }
+    70% { box-shadow: 0 0 0 7px rgba(251, 191, 36, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  }
   #fbSyncFab {
     position: fixed;
     bottom: 14px;
@@ -25544,12 +25587,13 @@ ${plan.leftoverSurplusMin >= 15 ? `
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    opacity: 0.88;
+    opacity: 0.9;
     transition: all 0.2s ease;
   }
   #fbSyncFab:hover { opacity: 1; transform: translateY(-2px); }
   #fbSyncFab.connected { border-color: #10b981; color: #047857; }
   #fbSyncFab.syncing { border-color: #f59e0b; color: #b45309; }
+  #fbSyncFab.dirty { border-color: #7c3aed; color: #7c3aed; }
   #fbSyncModal {
     display: none;
     position: fixed;
@@ -25568,46 +25612,98 @@ ${plan.leftoverSurplusMin >= 15 ? `
     border-radius: 22px;
     padding: 20px;
     width: 100%;
-    max-width: 430px;
+    max-width: 460px;
+    max-height: 88vh;
+    overflow-y: auto;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
     direction: rtl;
     text-align: right;
   }
   .fb-sync-box input {
     width: 100%;
-    padding: 10px 12px;
-    margin: 6px 0 12px;
+    padding: 9px 12px;
+    margin: 5px 0 10px;
     border-radius: 12px;
     border: 1px solid var(--border, #e4e7f2);
     background: var(--surface-2, #eff1f9);
     color: inherit;
-    font-size: 0.88rem;
+    font-size: 0.86rem;
   }
   .fb-sync-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .fb-backup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
     margin-top: 8px;
+    max-height: 210px;
+    overflow-y: auto;
+  }
+  .fb-backup-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: var(--surface-2, #eff1f9);
+    border: 1px solid var(--border, #e4e7f2);
+    font-size: 0.76rem;
   }
 </style>
+
+<!-- إشارة علوية تظهر فقط عند وجود تغييرات محلية تحتاج للمزامنة -->
+<button id="fbUnsyncedTopBadge" type="button" onclick="syncPendingChangesFromTopBadge()" title="اضغط لمزامنة تغييراتك الآن">
+  <span class="fb-pulse-dot"></span>
+  <span>☁️⬆️ تغييرات غير متزامنة</span>
+</button>
 
 <button id="fbSyncFab" type="button" onclick="openFbSyncModal()">☁️ مزامنة</button>
 
 <div id="fbSyncModal" onclick="if(event.target===this) closeFbSyncModal()">
   <div class="fb-sync-box">
-    <h3 style="margin-bottom:6px;">☁️ المزامنة اللحظية (Firebase)</h3>
-    <p id="fbSyncStatusText" style="font-size:0.82rem; color:var(--muted,#6a7392); margin-bottom:12px;">
-      أدخل رابط قاعدة البيانات وكلمة سر موحدة في التلفون والتابلت.
-    </p>
-    <label style="font-size:0.8rem; font-weight:700;">رابط Firebase Realtime Database:</label>
-    <input id="fbUrlInput" type="text" dir="ltr" placeholder="https://habitico-app-default-rtdb.asia-southeast1.firebasedatabase.app/" />
-    <label style="font-size:0.8rem; font-weight:700;">كلمة سر الغرفة السرية (نفسها في الجهازين):</label>
-    <input id="fbSecretInput" type="text" dir="ltr" placeholder="مثال: salah-habitico-2026" />
-    <div class="fb-sync-actions">
-      <button type="button" class="btn btn-primary" style="flex:1;" onclick="saveFbSyncConfig()">حفظ وتفعيل</button>
-      <button type="button" class="btn btn-outline" onclick="forcePushToFb()">⬆️ رفع الآن</button>
-      <button type="button" class="btn btn-outline" onclick="closeFbSyncModal()">إغلاق</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+      <h3 style="margin:0;">☁️ المزامنة اليدوية والنسخ الاحتياطية</h3>
+      <button type="button" class="btn btn-outline btn-sm" style="padding:3px 9px;" onclick="closeFbSyncModal()">✕</button>
     </div>
+    <p id="fbSyncStatusText" style="font-size:0.8rem; color:var(--muted,#6a7392); margin:0 0 10px;">
+      الجلب من السحابة تلقائي (عندما لا توجد تغييرات محلية غير مرفوعة)، أما الرفع فيدوي بالكامل عبر الشارة العلوية أو الزر أدناه.
+    </p>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+      <button type="button" class="btn btn-primary" style="flex:1; min-width:140px; font-weight:800;" onclick="forcePushToFb()">⬆️ رفع نسختي للسحابة</button>
+      <button type="button" class="btn btn-outline" style="flex:1; min-width:140px; font-weight:800;" onclick="manualPullFromFb()">⬇️ جلب النسخة من السحابة</button>
+    </div>
+
+    <details style="margin-bottom:12px; background:var(--surface-2,#eff1f9); border-radius:12px; padding:8px 10px; border:1px solid var(--border,#e4e7f2);">
+      <summary style="font-size:0.8rem; font-weight:800; cursor:pointer;">⚙️ إعدادات الربط (Firebase)</summary>
+      <div style="margin-top:8px;">
+        <label style="font-size:0.78rem; font-weight:700;">رابط Firebase Realtime Database:</label>
+        <input id="fbUrlInput" type="text" dir="ltr" placeholder="https://habitico-app-default-rtdb.asia-southeast1.firebasedatabase.app/" />
+        <label style="font-size:0.78rem; font-weight:700;">كلمة سر الغرفة السرية (نفسها في الجهازين):</label>
+        <input id="fbSecretInput" type="text" dir="ltr" placeholder="مثال: salah-habitico-2026" />
+        <div class="fb-sync-actions">
+          <button type="button" class="btn btn-primary btn-sm" style="flex:1;" onclick="saveFbSyncConfig()">💾 حفظ إعدادات الربط</button>
+        </div>
+      </div>
+    </details>
+
+    <!-- سجل النسخ الاحتياطية السابقة (آخر 6 تحديثات) -->
+    <div style="border-top:1px dashed var(--border, rgba(148,163,184,0.35)); padding-top:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div>
+          <strong style="font-size:0.84rem;">🕰️ النسخ الاحتياطية السابقة (آخر 6 تحديثات)</strong>
+          <div style="font-size:0.72rem; color:var(--muted,#6a7392);">تُحفظ تلقائياً قبل أي جلب أو بعد كل رفع لتستعيد شغلك لو حصل أي خطأ.</div>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" style="font-size:0.73rem; padding:4px 8px;" onclick="createManualFbBackupNow()">📸 حفظ نسخة الآن</button>
+      </div>
+      <div id="fbBackupHistoryList" class="fb-backup-list"></div>
+    </div>
+
     <div id="hbOtaBox" style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--border, rgba(148,163,184,0.35)); display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
       <div style="font-size:0.78rem; color:var(--muted,#6a7392);">
         <div><strong>🚀 التحديث التلقائي (OTA)</strong></div>
@@ -25621,15 +25717,23 @@ ${plan.leftoverSurplusMin >= 15 ? `
 <script>
 (function() {
   const CFG_KEY = '__habitico_fb_cfg';
+  const BACKUPS_KEY = '__habitico_fb_backups';
+  const MAX_BACKUPS = 6; // يحفظ آخر 6 نسخ احتياطية على الأقل
   const origSetItem = localStorage.setItem.bind(localStorage);
   const origRemoveItem = localStorage.removeItem.bind(localStorage);
   const origClear = localStorage.clear.bind(localStorage);
 
   let isApplyingRemote = false;
-  let pushTimer = null;
-  let eventSource = null;
-  let pendingReload = false;
   let lastSyncedDigest = '';
+
+  function isInternalKey(k) {
+    return !k || k.startsWith('__habitico_fb_') || k.startsWith('__habitico_ota_');
+  }
+
+  function toast(msg) {
+    if (typeof showAppToast === 'function') showAppToast(msg);
+    else console.log(msg);
+  }
 
   function normalizeForDiff(dataObj) {
     const out = {};
@@ -25681,7 +25785,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && !k.startsWith('__habitico_fb_')) {
+        if (k && !isInternalKey(k)) {
           data[k] = localStorage.getItem(k);
         }
       }
@@ -25689,32 +25793,181 @@ ${plan.leftoverSurplusMin >= 15 ? `
     return data;
   }
 
-  function setFabState(state, text) {
-    const fab = document.getElementById('fbSyncFab');
-    if (!fab) return;
-    fab.className = state || '';
-    fab.textContent = text;
+  function summarizeSnapshot(dataObj) {
+    try {
+      const raw = dataObj && dataObj['habitico_production_v1'];
+      if (typeof raw === 'string') {
+        const p = JSON.parse(raw);
+        const tCount = Array.isArray(p.studyTasks) ? p.studyTasks.length : 0;
+        const hCount = Array.isArray(p.habitsV2) ? p.habitsV2.length : 0;
+        return `${tCount} مهمة • ${hCount} عادة`;
+      }
+    } catch (e) {}
+    return 'نسخة بيانات التطبيق';
   }
 
-  async function pushToFirebase(forcePush) {
+  function getBackupsList() {
+    try {
+      const raw = localStorage.getItem(BACKUPS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveBackupsList(arr) {
+    let list = Array.isArray(arr) ? arr.slice(0, MAX_BACKUPS) : [];
+    while (list.length > 0) {
+      try {
+        origSetItem(BACKUPS_KEY, JSON.stringify(list));
+        return true;
+      } catch (e) {
+        // لو امتلأت مساحة localStorage نحذف أقدم نسخة فقط ونعيد المحاولة
+        list.pop();
+      }
+    }
+    return false;
+  }
+
+  function recordBackupSnapshot(reasonLabel) {
+    const currentData = getAllAppData();
+    if (Object.keys(currentData).length === 0) return null;
+    const digest = normalizeForDiff(currentData);
+    const list = getBackupsList();
+    // تجنب تكرار نسختين متطابقتين تماماً وراء بعض
+    if (list.length > 0 && list[0].digest === digest) {
+      list[0].ts = Date.now();
+      list[0].reason = reasonLabel || list[0].reason;
+      saveBackupsList(list);
+      return list[0];
+    }
+    const entry = {
+      id: 'bk_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      ts: Date.now(),
+      reason: reasonLabel || 'حفظ نسخة',
+      summary: summarizeSnapshot(currentData),
+      digest,
+      payloadStr: JSON.stringify(currentData)
+    };
+    list.unshift(entry);
+    saveBackupsList(list.slice(0, MAX_BACKUPS));
+    return entry;
+  }
+
+  function fmtBackupDate(ts) {
+    try {
+      const d = new Date(ts);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} • ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function renderFbBackupHistoryList() {
+    const box = document.getElementById('fbBackupHistoryList');
+    if (!box) return;
+    const list = getBackupsList();
+    if (list.length === 0) {
+      box.innerHTML = '<div class="hint" style="text-align:center; padding:10px; font-size:0.75rem;">لا توجد نسخ محفوظة بعد — ستُحفظ تلقائياً عند أول رفع أو جلب، أو اضغط «📸 حفظ نسخة الآن».</div>';
+      return;
+    }
+    box.innerHTML = list.map((bk, idx) => `
+      <div class="fb-backup-row">
+        <div style="min-width:0; flex:1;">
+          <div style="font-weight:800; color:var(--text);">${idx === 0 ? '🟢 ' : '🕰️ '}${bk.reason || 'نسخة محفوظة'}</div>
+          <div style="font-size:0.7rem; color:var(--muted,#6a7392); margin-top:2px;">${fmtBackupDate(bk.ts)} • ${bk.summary || ''}</div>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" style="font-size:0.72rem; padding:4px 8px; white-space:nowrap;" onclick="restoreFbBackupById('${bk.id}')">↩️ استعادة</button>
+      </div>
+    `).join('');
+  }
+
+  function updateSyncIndicatorsUI() {
+    const cfg = getCfg();
+    const hasEndpoint = !!getEndpoint(cfg);
+    const badge = document.getElementById('fbUnsyncedTopBadge');
+    const fab = document.getElementById('fbSyncFab');
+
+    if (badge) {
+      if (cfg.dirty) badge.classList.add('visible');
+      else badge.classList.remove('visible');
+    }
+
+    if (fab) {
+      if (!hasEndpoint) {
+        fab.className = '';
+        fab.textContent = '☁️ مزامنة';
+      } else if (cfg.dirty) {
+        fab.className = 'dirty';
+        fab.textContent = '☁️⬆️ مزامنة';
+      } else {
+        fab.className = 'connected';
+        fab.textContent = '☁️ مزامنة';
+      }
+    }
+  }
+
+  function setFabBusy(text) {
+    const fab = document.getElementById('fbSyncFab');
+    if (fab) {
+      fab.className = 'syncing';
+      fab.textContent = text;
+    }
+  }
+
+  function markLocalChangesPending() {
+    if (isApplyingRemote) return;
+    const currentDigest = normalizeForDiff(getAllAppData());
+    if (lastSyncedDigest && currentDigest === lastSyncedDigest) return;
+    const cfg = getCfg();
+    if (!cfg.dirty) {
+      cfg.dirty = true;
+      saveCfg(cfg);
+    }
+    updateSyncIndicatorsUI();
+  }
+
+  // اعتراض التعديلات المحلية لإظهار شارة التغييرات العلوية فقط (بدون أي رفع أو سحب تلقائي!)
+  localStorage.setItem = function(k, v) {
+    origSetItem(k, v);
+    if (!isInternalKey(k)) markLocalChangesPending();
+  };
+  localStorage.removeItem = function(k) {
+    origRemoveItem(k);
+    if (!isInternalKey(k)) markLocalChangesPending();
+  };
+  localStorage.clear = function() {
+    const cfg = getCfg();
+    const backups = getBackupsList();
+    origClear();
+    saveCfg(cfg);
+    saveBackupsList(backups);
+    markLocalChangesPending();
+  };
+
+  async function pushToFirebaseManual() {
     const cfg = getCfg();
     const endpoint = getEndpoint(cfg);
-    if (!endpoint || isApplyingRemote) return;
+    if (!endpoint) {
+      openFbSyncModal();
+      toast('⚙️ أدخل رابط Firebase وكلمة سر الغرفة أولاً ثم اضغط حفظ.');
+      return { status: 'no_config' };
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      toast('📡 أنت حالياً غير متصل بالإنترنت، حاول مرة أخرى بعد ما تتصل بالإنترنت.');
+      updateSyncIndicatorsUI();
+      return { status: 'offline' };
+    }
+
+    setFabBusy('⏳ جاري الرفع...');
+    const badge = document.getElementById('fbUnsyncedTopBadge');
+    if (badge) badge.style.opacity = '0.7';
 
     const currentData = getAllAppData();
     const currentDigest = normalizeForDiff(currentData);
-    if (!forcePush && !cfg.dirty && lastSyncedDigest && currentDigest === lastSyncedDigest) {
-      return;
-    }
-
-    if (!navigator.onLine) {
-      cfg.dirty = true;
-      saveCfg(cfg);
-      setFabState('', '📴 أوفلاين (حفظ محلي)');
-      return;
-    }
-
-    setFabState('syncing', '⏳ جاري الرفع...');
     const now = Date.now();
     const body = {
       updatedAt: now,
@@ -25728,211 +25981,307 @@ ${plan.leftoverSurplusMin >= 15 ? `
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (res.ok) {
+      if (res && res.ok) {
+        recordBackupSnapshot('بعد الرفع للسحابة');
         cfg.lastTs = now;
         cfg.dirty = false;
         saveCfg(cfg);
         lastSyncedDigest = currentDigest;
-        setFabState('connected', '🟢 متزامن');
+        updateSyncIndicatorsUI();
+        renderFbBackupHistoryList();
+        toast('✅ تمت المزامنة بنجاح وحُفظت نسختك في السحابة!');
+        return { status: 'ok' };
       } else {
-        cfg.dirty = true;
-        saveCfg(cfg);
-        setFabState('', `⚠️ خطأ ${res.status}`);
+        const code = res ? res.status : 'err';
+        toast(`⚠️ تعذر الرفع للسحابة (خطأ ${code}) — بياناتك محفوظة محلياً.`);
+        updateSyncIndicatorsUI();
+        return { status: 'http_error', code };
       }
     } catch (err) {
-      cfg.dirty = true;
-      saveCfg(cfg);
-      setFabState('', '📴 أوفلاين (حفظ محلي)');
-    }
-  }
-
-  function schedulePush() {
-    if (isApplyingRemote) return;
-    const currentDigest = normalizeForDiff(getAllAppData());
-    if (lastSyncedDigest && currentDigest === lastSyncedDigest) return;
-    const cfg = getCfg();
-    if (getEndpoint(cfg)) {
-      cfg.dirty = true;
-      saveCfg(cfg);
-    }
-    if (!navigator.onLine) {
-      if (getEndpoint(cfg)) setFabState('', '📴 أوفلاين (حفظ محلي)');
-      return;
-    }
-    clearTimeout(pushTimer);
-    pushTimer = setTimeout(pushToFirebase, 900);
-  }
-
-  localStorage.setItem = function(k, v) {
-    origSetItem(k, v);
-    if (!k.startsWith('__habitico_fb_')) schedulePush();
-  };
-  localStorage.removeItem = function(k) {
-    origRemoveItem(k);
-    if (!k.startsWith('__habitico_fb_')) schedulePush();
-  };
-  localStorage.clear = function() {
-    const cfg = getCfg();
-    origClear();
-    saveCfg(cfg);
-    schedulePush();
-  };
-
-  function applyRemoteSnapshot(remote) {
-    const cfg = getCfg();
-    if (!remote || typeof remote !== 'object') return;
-    if (remote.deviceId === cfg.deviceId) return;
-    if (!remote.updatedAt || remote.updatedAt <= (cfg.lastTs || 0)) return;
-
-    let remotePayload = {};
-    if (typeof remote.payloadStr === 'string') {
-      try {
-        const parsed = JSON.parse(remote.payloadStr);
-        if (parsed && typeof parsed === 'object') remotePayload = parsed;
-      } catch (e) {
-        return;
-      }
-    } else if (remote.payload && typeof remote.payload === 'object') {
-      remotePayload = remote.payload;
-    }
-    const currentPayload = getAllAppData();
-    const remoteDigest = normalizeForDiff(remotePayload);
-    const currentDigest = normalizeForDiff(currentPayload);
-    if (remoteDigest === currentDigest) {
-      cfg.lastTs = remote.updatedAt;
-      cfg.dirty = false;
-      saveCfg(cfg);
-      lastSyncedDigest = currentDigest;
-      return;
-    }
-
-    isApplyingRemote = true;
-    try {
-      Object.keys(currentPayload).forEach(k => {
-        if (!(k in remotePayload)) origRemoveItem(k);
-      });
-      Object.keys(remotePayload).forEach(k => {
-        origSetItem(k, remotePayload[k]);
-      });
-      cfg.lastTs = remote.updatedAt;
-      cfg.dirty = false;
-      saveCfg(cfg);
+      toast('📡 أنت حالياً غير متصل بالإنترنت، حاول مرة أخرى بعد ما تتصل بالإنترنت.');
+      updateSyncIndicatorsUI();
+      return { status: 'network_error' };
     } finally {
-      isApplyingRemote = false;
-    }
-
-    lastSyncedDigest = remoteDigest;
-    const active = document.activeElement;
-    const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
-    if (isTyping) {
-      pendingReload = true;
-      setFabState('connected', '🔄 اضغط لتحديث الشاشة');
-    } else {
-      location.reload();
+      if (badge) badge.style.opacity = '';
     }
   }
 
-  function startRealtimeStream() {
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
-    }
+  async function pullFromFirebaseManual() {
     const cfg = getCfg();
     const endpoint = getEndpoint(cfg);
     if (!endpoint) {
-      setFabState('', '☁️ ربط المزامنة');
-      return;
+      toast('⚙️ أدخل رابط Firebase وكلمة سر الغرفة أولاً ثم اضغط حفظ.');
+      return { status: 'no_config' };
     }
 
-    if (!navigator.onLine) {
-      setFabState('', '📴 أوفلاين (حفظ محلي)');
-      return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      toast('📡 أنت حالياً غير متصل بالإنترنت، حاول مرة أخرى بعد ما تتصل بالإنترنت.');
+      return { status: 'offline' };
     }
 
-    if (cfg.dirty) {
-      pushToFirebase(true);
-    }
-
-    setFabState('syncing', '⏳ اتصال...');
-    eventSource = new EventSource(endpoint);
-
-    eventSource.addEventListener('put', function(e) {
-      try {
-        const msg = JSON.parse(e.data);
-        setFabState('connected', '🟢 متزامن');
-        if (msg.path === '/') {
-          if (msg.data === null && Object.keys(getAllAppData()).length > 0) {
-            pushToFirebase(true);
-          } else if (msg.data) {
-            applyRemoteSnapshot(msg.data);
-          }
-        }
-      } catch (err) {}
-    });
-
-    eventSource.onerror = function() {
-      if (!navigator.onLine) {
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
-        setFabState('', '📴 أوفلاين (حفظ محلي)');
-      } else {
-        setFabState('', '📴 إعادة اتصال...');
+    setFabBusy('⏳ جاري الجلب...');
+    try {
+      const res = await fetch(endpoint + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!res || !res.ok) {
+        toast(`⚠️ تعذر الجلب من السحابة (خطأ ${res ? res.status : 'err'}).`);
+        updateSyncIndicatorsUI();
+        return { status: 'http_error' };
       }
-    };
+      const remote = await res.json();
+      if (!remote || typeof remote !== 'object') {
+        toast('ℹ️ لا توجد نسخة محفوظة في السحابة لهذه الغرفة بعد.');
+        updateSyncIndicatorsUI();
+        return { status: 'empty' };
+      }
+
+      let remotePayload = {};
+      if (typeof remote.payloadStr === 'string') {
+        remotePayload = JSON.parse(remote.payloadStr);
+      } else if (remote.payload && typeof remote.payload === 'object') {
+        remotePayload = remote.payload;
+      }
+
+      if (!remotePayload || typeof remotePayload !== 'object' || Object.keys(remotePayload).length === 0) {
+        toast('⚠️ النسخة السحابية فارغة؛ لم يتم استبدال بياناتك.');
+        updateSyncIndicatorsUI();
+        return { status: 'empty_payload' };
+      }
+
+      const currentPayload = getAllAppData();
+      const remoteDigest = normalizeForDiff(remotePayload);
+      const currentDigest = normalizeForDiff(currentPayload);
+      if (remoteDigest === currentDigest) {
+        cfg.lastTs = remote.updatedAt || Date.now();
+        cfg.dirty = false;
+        saveCfg(cfg);
+        lastSyncedDigest = currentDigest;
+        updateSyncIndicatorsUI();
+        toast('✅ بياناتك مطابقة تماماً لأحدث نسخة في السحابة!');
+        return { status: 'identical' };
+      }
+
+      // حفظ نسخة احتياطية كاملة من جهازك الحالي تلقائياً قبل الجلب!
+      recordBackupSnapshot('حفظ تلقائي قبل الجلب من السحابة');
+
+      isApplyingRemote = true;
+      try {
+        Object.keys(currentPayload).forEach(k => {
+          if (!(k in remotePayload)) origRemoveItem(k);
+        });
+        Object.keys(remotePayload).forEach(k => {
+          if (!isInternalKey(k)) origSetItem(k, remotePayload[k]);
+        });
+        cfg.lastTs = remote.updatedAt || Date.now();
+        cfg.dirty = false;
+        saveCfg(cfg);
+      } finally {
+        isApplyingRemote = false;
+      }
+
+      lastSyncedDigest = remoteDigest;
+      updateSyncIndicatorsUI();
+      toast('✅ تم جلب النسخة من السحابة بنجاح (وحفظ نسختك السابقة في السجل)!');
+      setTimeout(() => { try { location.reload(); } catch (e) {} }, 500);
+      return { status: 'pulled' };
+    } catch (err) {
+      toast('📡 أنت حالياً غير متصل بالإنترنت، حاول مرة أخرى بعد ما تتصل بالإنترنت.');
+      updateSyncIndicatorsUI();
+      return { status: 'network_error' };
+    }
   }
 
+  window.syncPendingChangesFromTopBadge = function() {
+    return pushToFirebaseManual();
+  };
+
   window.openFbSyncModal = function() {
-    if (pendingReload) {
-      location.reload();
-      return;
-    }
     const cfg = getCfg();
-    document.getElementById('fbUrlInput').value = cfg.url || '';
-    document.getElementById('fbSecretInput').value = cfg.secret || '';
-    document.getElementById('fbSyncModal').style.display = 'flex';
+    const urlInp = document.getElementById('fbUrlInput');
+    const secInp = document.getElementById('fbSecretInput');
+    if (urlInp) urlInp.value = cfg.url || '';
+    if (secInp) secInp.value = cfg.secret || '';
+    renderFbBackupHistoryList();
+    const modal = document.getElementById('fbSyncModal');
+    if (modal) modal.style.display = 'flex';
   };
 
   window.closeFbSyncModal = function() {
-    document.getElementById('fbSyncModal').style.display = 'none';
+    const modal = document.getElementById('fbSyncModal');
+    if (modal) modal.style.display = 'none';
   };
 
   window.saveFbSyncConfig = function() {
     const cfg = getCfg();
-    cfg.url = document.getElementById('fbUrlInput').value.trim();
-    cfg.secret = document.getElementById('fbSecretInput').value.trim();
-    cfg.lastTs = 0;
+    cfg.url = (document.getElementById('fbUrlInput').value || '').trim();
+    cfg.secret = (document.getElementById('fbSecretInput').value || '').trim();
     saveCfg(cfg);
-    closeFbSyncModal();
-    startRealtimeStream();
+    updateSyncIndicatorsUI();
+    toast('✅ تم حفظ إعدادات الربط؛ يمكنك الآن الرفع أو الجلب يدوياً متى شئت.');
   };
 
   window.forcePushToFb = function() {
     closeFbSyncModal();
-    pushToFirebase(true);
+    return pushToFirebaseManual();
   };
 
-  window.addEventListener('offline', () => {
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
+  window.manualPullFromFb = function() {
+    const doPull = () => {
+      closeFbSyncModal();
+      return pullFromFirebaseManual();
+    };
+    if (typeof openAppConfirmDialog === 'function') {
+      openAppConfirmDialog(
+        '⬇️ جلب النسخة من السحابة',
+        'سيتم حفظ نسخة احتياطية من بياناتك الحالية في السجل أولاً، ثم جلب النسخة المحفوظة في السحابة. هل تريد المتابعة؟',
+        doPull,
+        false
+      );
+    } else {
+      doPull();
     }
+  };
+
+  window.createManualFbBackupNow = function() {
+    recordBackupSnapshot('نسخة احتياطية يدوية');
+    renderFbBackupHistoryList();
+    toast('📸 تم حفظ نسخة احتياطية من شغلك الحالي في السجل!');
+  };
+
+  window.restoreFbBackupById = function(backupId) {
+    const list = getBackupsList();
+    const target = list.find(b => b && b.id === backupId);
+    if (!target || !target.payloadStr) return toast('⚠️ تعذر العثور على هذه النسخة.');
+
+    const doRestore = () => {
+      try {
+        const parsed = JSON.parse(target.payloadStr);
+        if (!parsed || typeof parsed !== 'object') throw new Error('bad snapshot');
+        // حفظ الحالة الحالية أولاً قبل الاستعادة حتى لا تفقد شيئاً
+        recordBackupSnapshot('حفظ تلقائي قبل الاستعادة');
+        const currentPayload = getAllAppData();
+        isApplyingRemote = true;
+        try {
+          Object.keys(currentPayload).forEach(k => {
+            if (!(k in parsed)) origRemoveItem(k);
+          });
+          Object.keys(parsed).forEach(k => {
+            if (!isInternalKey(k)) origSetItem(k, parsed[k]);
+          });
+          const cfg = getCfg();
+          cfg.dirty = true; // تظهر شارة التغييرات العلوية لتتمكن من رفع النسخة المستعادة للسحابة إذا أردت
+          saveCfg(cfg);
+        } finally {
+          isApplyingRemote = false;
+        }
+        closeFbSyncModal();
+        toast('↩️ تمت استعادة النسخة الاحتياطية بنجاح! جاري تحديث الشاشة...');
+        setTimeout(() => { try { location.reload(); } catch (e) {} }, 500);
+      } catch (e) {
+        toast('⚠️ تعذر استعادة هذه النسخة.');
+      }
+    };
+
+    if (typeof openAppConfirmDialog === 'function') {
+      openAppConfirmDialog(
+        '↩️ استعادة نسخة سابقة',
+        `ستتم استعادة النسخة المحفوظة بتاريخ (${fmtBackupDate(target.ts)} — ${target.summary}) مع حفظ نسخة من وضعك الحالي أولاً. هل تريد المتابعة؟`,
+        doRestore,
+        false
+      );
+    } else {
+      doRestore();
+    }
+  };
+
+  let autoPullInFlight = false;
+
+  async function autoPullFromCloudIfClean() {
+    if (autoPullInFlight || isApplyingRemote) return { status: 'busy' };
     const cfg = getCfg();
-    if (getEndpoint(cfg)) {
-      setFabState('', '📴 أوفلاين (حفظ محلي)');
+    const endpoint = getEndpoint(cfg);
+    if (!endpoint) return { status: 'no_config' };
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return { status: 'offline' };
+
+    // حماية حديدية: إذا كان على هذا الجهاز تغييرات محلية غير مرفوعة، ممنوع الاستبدال التلقائي!
+    if (cfg.dirty) {
+      updateSyncIndicatorsUI();
+      return { status: 'skipped_dirty' };
+    }
+
+    autoPullInFlight = true;
+    try {
+      const res = await fetch(endpoint + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!res || !res.ok) return { status: 'http_error' };
+      const remote = await res.json();
+      if (!remote || typeof remote !== 'object') return { status: 'empty' };
+      if (remote.deviceId === cfg.deviceId) return { status: 'same_device' };
+      if (remote.updatedAt && cfg.lastTs && remote.updatedAt <= cfg.lastTs) return { status: 'not_newer' };
+
+      let remotePayload = {};
+      if (typeof remote.payloadStr === 'string') {
+        remotePayload = JSON.parse(remote.payloadStr);
+      } else if (remote.payload && typeof remote.payload === 'object') {
+        remotePayload = remote.payload;
+      }
+      if (!remotePayload || typeof remotePayload !== 'object' || Object.keys(remotePayload).length === 0) {
+        return { status: 'empty_payload' };
+      }
+
+      // فحص أخير قبل الكتابة للتأكد إن المستخدم لم يعدّل شيئاً أثناء الجلب
+      if (getCfg().dirty) return { status: 'skipped_dirty' };
+
+      const currentPayload = getAllAppData();
+      const remoteDigest = normalizeForDiff(remotePayload);
+      const currentDigest = normalizeForDiff(currentPayload);
+      if (remoteDigest === currentDigest) {
+        cfg.lastTs = remote.updatedAt || Date.now();
+        saveCfg(cfg);
+        lastSyncedDigest = currentDigest;
+        updateSyncIndicatorsUI();
+        return { status: 'identical' };
+      }
+
+      // حفظ نسخة احتياطية كاملة قبل الجلب التلقائي
+      recordBackupSnapshot('حفظ تلقائي قبل الجلب التلقائي');
+
+      isApplyingRemote = true;
+      try {
+        Object.keys(currentPayload).forEach(k => {
+          if (!(k in remotePayload)) origRemoveItem(k);
+        });
+        Object.keys(remotePayload).forEach(k => {
+          if (!isInternalKey(k)) origSetItem(k, remotePayload[k]);
+        });
+        cfg.lastTs = remote.updatedAt || Date.now();
+        cfg.dirty = false;
+        saveCfg(cfg);
+      } finally {
+        isApplyingRemote = false;
+      }
+
+      lastSyncedDigest = remoteDigest;
+      updateSyncIndicatorsUI();
+      toast('☁️⬇️ تم جلب أحدث نسخة من السحابة تلقائياً (وحفظ نسختك السابقة في السجل).');
+      setTimeout(() => { try { location.reload(); } catch (e) {} }, 500);
+      return { status: 'auto_pulled' };
+    } catch (e) {
+      return { status: 'error' };
+    } finally {
+      autoPullInFlight = false;
+    }
+  }
+
+  window.addEventListener('online', () => {
+    setTimeout(() => { autoPullFromCloudIfClean(); }, 800);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      setTimeout(() => { autoPullFromCloudIfClean(); }, 600);
     }
   });
 
-  window.addEventListener('online', () => {
-    const cfg = getCfg();
-    if (cfg.dirty) {
-      pushToFirebase(true);
-    } else {
-      pushToFirebase();
-    }
-    startRealtimeStream();
-  });
+  // Expose helpers for testing
+  window.__hbSyncTest = { getCfg, getBackupsList, recordBackupSnapshot, pushToFirebaseManual, pullFromFirebaseManual, autoPullFromCloudIfClean };
 
   // Register Service Worker for full offline PWA support (skip inside native Capacitor APK)
   const isCapNative = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
@@ -25943,7 +26292,8 @@ ${plan.leftoverSurplusMin >= 15 ? `
   }
 
   lastSyncedDigest = normalizeForDiff(getAllAppData());
-  startRealtimeStream();
+  updateSyncIndicatorsUI();
+  setTimeout(() => { autoPullFromCloudIfClean(); }, 1200);
 })();
 </script>
 
