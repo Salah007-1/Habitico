@@ -27756,9 +27756,8 @@ ${plan.leftoverSurplusMin >= 15 ? `
       updateOtaUiLabel("⬇️ جاري تنزيل الإصدار " + remote.version + "...");
       toast("⬇️ يوجد تحديث جديد للتطبيق (" + remote.version + ") — جاري التنزيل في الخلفية...");
 
-      const bundleUrl = remote.url + (remote.url.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(remote.version);
       const bundle = await updater.download({
-        url: bundleUrl,
+        url: String(remote.url),
         version: String(remote.version)
       });
 
@@ -27784,8 +27783,9 @@ ${plan.leftoverSurplusMin >= 15 ? `
       return { status: "updated", version: remote.version };
     } catch (err) {
       console.error("Habitico OTA update error:", err);
-      updateOtaUiLabel();
-      if (manual) toast("⚠️ تعذر تنزيل التحديث حالياً — بياناتك بأمان وحاول لاحقاً.");
+      const errDetail = (err && (err.message || err.errorMessage)) ? String(err.message || err.errorMessage) : String(err || "unknown");
+      updateOtaUiLabel("خطأ بالتحديث: " + errDetail);
+      if (manual) toast("⚠️ تعذر تنزيل التحديث: " + errDetail);
       return { status: "error", error: String(err && err.message || err) };
     } finally {
       otaInFlight = false;
