@@ -26,7 +26,7 @@ jobs:
       - name: Build OTA bundle.zip & version.json
         run: |
           python3 - << 'PY'
-          import hashlib, json, os, os, shutil, zipfile
+          import hashlib, json, os, shutil, zipfile
           from datetime import datetime, timezone
 
           os.makedirs('ota', exist_ok=True)
@@ -127,7 +127,7 @@ jobs:
           [ -f icon.png ] && cp icon.png www/icon.png || true
           [ -f sw.js ] && cp sw.js www/sw.js || true
           python3 - << 'PY'
-          import hashlib, json
+          import hashlib, json, os
           from datetime import datetime, timezone
           with open('index.html', 'rb') as fp:
               h = hashlib.sha256(fp.read()).hexdigest()[:10]
