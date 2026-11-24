@@ -26,7 +26,7 @@ jobs:
       - name: Build OTA bundle.zip & version.json
         run: |
           python3 - << 'PY'
-          import hashlib, json, os, shutil, zipfile
+          import hashlib, json, os, os, shutil, zipfile
           from datetime import datetime, timezone
 
           os.makedirs('ota', exist_ok=True)
@@ -41,7 +41,8 @@ jobs:
               h = hashlib.sha256(fp.read()).hexdigest()[:10]
 
           now_utc = datetime.now(timezone.utc)
-          version = f"{now_utc.strftime('%Y%m%d')}-{h}"
+          run_num = os.environ.get('GITHUB_RUN_NUMBER', '1')
+          version = f"1.1.{run_num}"
 
           meta = {
               "version": version,
@@ -132,7 +133,7 @@ jobs:
               h = hashlib.sha256(fp.read()).hexdigest()[:10]
           now_utc = datetime.now(timezone.utc)
           meta = {
-              "version": f"{now_utc.strftime('%Y%m%d')}-{h}",
+              "version": f"1.1.{os.environ.get('GITHUB_RUN_NUMBER', '1')}",
               "hash": h
           }
           with open('www/ota-builtin-version.json', 'w', encoding='utf-8') as fp:
