@@ -1,164 +1,55 @@
-name: Habitico OTA Live Update & Android APK
+name: Build Habitico Android APK
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'index.html'
-      - 'sw.js'
-      - 'manifest.json'
       - 'icon.png'
       - 'capacitor.config.json'
       - 'package.json'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  publish-ota-bundle:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build OTA bundle.zip & version.json
-        run: |
-          python3 - << 'PY'
-          import hashlib, json, os, shutil, zipfile
-          from datetime import datetime, timezone
-
-          os.makedirs('ota', exist_ok=True)
-          os.makedirs('www_ota', exist_ok=True)
-
-          files = ['index.html', 'sw.js', 'manifest.json', 'icon.png']
-          for f in files:
-              if os.path.isfile(f):
-                  shutil.copy2(f, os.path.join('www_ota', f))
-
-          with open('index.html', 'rb') as fp:
-              h = hashlib.sha256(fp.read()).hexdigest()[:10]
-
-          now_utc = datetime.now(timezone.utc)
-          run_num = os.environ.get('GITHUB_RUN_NUMBER', '1')
-          version = f"1.1.{run_num}"
-
-          meta = {
-              "version": version,
-              "hash": h,
-              "url": "https://raw.githubusercontent.com/Salah007-1/Habitico/main/ota/bundle.zip",
-              "fallbackUrl": "https://salah007-1.github.io/Habitico/ota/bundle.zip",
-              "updatedAt": now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-          }
-          with open(os.path.join('www_ota', 'ota-builtin-version.json'), 'w', encoding='utf-8') as fp:
-              json.dump(meta, fp, ensure_ascii=False, indent=2)
-
-          bundle_path = os.path.join('ota', 'bundle.zip')
-          with zipfile.ZipFile(bundle_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-              for fname in sorted(os.listdir('www_ota')):
-                  if fname.startswith('.'):
-                      continue
-                  full = os.path.join('www_ota', fname)
-                  if os.path.isfile(full):
-                      zf.write(full, fname)
-
-          with open(os.path.join('ota', 'version.json'), 'w', encoding='utf-8') as fp:
-              json.dump(meta, fp, ensure_ascii=False, indent=2)
-
-          print("Published OTA bundle:", version)
-          PY
-
-      - name: Commit & push OTA bundle to main (GitHub Pages)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ota/bundle.zip ota/version.json
-          if ! git diff --cached --quiet; then
-            VER=$(python3 -c "import json; print(json.load(open('ota/version.json'))['version'])")
-            git commit -m "chore(ota): publish live bundle ${VER} [skip ci]"
-            git pull --rebase origin main || true
-            git push origin HEAD:main
-          else
-            echo "No OTA bundle changes to commit."
-          fi
-
   build-android-apk:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Check if native APK rebuild is needed
-        id: check_native
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "rebuild=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "package.json")
-          echo "Changed files: $CHANGED"
-          if echo "$CHANGED" | grep -Eq '^(package\.json|capacitor\.config\.json|icon\.png|\.github/workflows/build-apk\.yml)$'; then
-            echo "rebuild=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "rebuild=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Setup Node.js 22
-        if: steps.check_native.outputs.rebuild == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Setup Java 21
-        if: steps.check_native.outputs.rebuild == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Prepare web assets in www/ (with built-in OTA hash)
-        if: steps.check_native.outputs.rebuild == 'true'
+      - name: Prepare web assets in www/
         run: |
           mkdir -p www
           cp index.html www/index.html
           [ -f manifest.json ] && cp manifest.json www/manifest.json || true
           [ -f icon.png ] && cp icon.png www/icon.png || true
           [ -f sw.js ] && cp sw.js www/sw.js || true
-          python3 - << 'PY'
-          import hashlib, json, os
-          from datetime import datetime, timezone
-          with open('index.html', 'rb') as fp:
-              h = hashlib.sha256(fp.read()).hexdigest()[:10]
-          now_utc = datetime.now(timezone.utc)
-          meta = {
-              "version": f"1.1.{os.environ.get('GITHUB_RUN_NUMBER', '1')}",
-              "hash": h
-          }
-          with open('www/ota-builtin-version.json', 'w', encoding='utf-8') as fp:
-              json.dump(meta, fp, ensure_ascii=False, indent=2)
-          PY
 
       - name: Install Capacitor dependencies
-        if: steps.check_native.outputs.rebuild == 'true'
         run: npm install --no-audit --no-fund
 
       - name: Add Android platform & sync plugins
-        if: steps.check_native.outputs.rebuild == 'true'
         run: |
           npx cap add android
           npx cap sync android
 
       - name: Configure Android permissions (Notifications & Exact Alarms)
-        if: steps.check_native.outputs.rebuild == 'true'
         run: |
           python3 - << 'PY'
           manifest_path = 'android/app/src/main/AndroidManifest.xml'
           with open(manifest_path, 'r', encoding='utf-8') as f:
               xml = f.read()
-
           perms = [
               'android.permission.INTERNET',
               'android.permission.POST_NOTIFICATIONS',
@@ -168,20 +59,14 @@ jobs:
               'android.permission.WAKE_LOCK',
               'android.permission.VIBRATE'
           ]
-          inject = []
-          for p in perms:
-              tag = f'    <uses-permission android:name="{p}" />'
-              if p not in xml:
-                  inject.append(tag)
+          inject = [f'    <uses-permission android:name="{p}" />' for p in perms if p not in xml]
           if inject:
               xml = xml.replace('<application', '\n'.join(inject) + '\n\n    <application', 1)
           with open(manifest_path, 'w', encoding='utf-8') as f:
               f.write(xml)
-          print('Manifest updated successfully')
           PY
 
       - name: Apply Properly Scaled Adaptive Fox Icon & White Vector Notification Icon
-        if: steps.check_native.outputs.rebuild == 'true'
         run: |
           python3 -c "import PIL" 2>/dev/null || pip install --quiet pillow
           python3 - << 'PY'
@@ -189,15 +74,11 @@ jobs:
           from PIL import Image
 
           res_root = 'android/app/src/main/res'
-
-          # 1) Generate properly padded Android Adaptive Icon (no zoom/crop!) from icon.png
           if os.path.isfile('icon.png'):
               src = Image.open('icon.png').convert('RGBA')
-              # Sample corner pixel for seamless full-bleed background color
               px = src.getpixel((4, 4))
               bg_hex = '#{:02X}{:02X}{:02X}'.format(px[0], px[1], px[2])
 
-              # Write ic_launcher_background.xml matching icon.png background
               values_dir = os.path.join(res_root, 'values')
               os.makedirs(values_dir, exist_ok=True)
               with open(os.path.join(values_dir, 'ic_launcher_background.xml'), 'w', encoding='utf-8') as f:
@@ -207,7 +88,6 @@ jobs:
           </resources>
           ''')
 
-              # Write adaptive icon XMLs pointing to background color + padded foreground
               anydpi_dir = os.path.join(res_root, 'mipmap-anydpi-v26')
               os.makedirs(anydpi_dir, exist_ok=True)
               adaptive_xml = '''<?xml version="1.0" encoding="utf-8"?>
@@ -220,24 +100,17 @@ jobs:
                   with open(os.path.join(anydpi_dir, name), 'w', encoding='utf-8') as f:
                       f.write(adaptive_xml)
 
-              # Density map: (dir, legacy_size, adaptive_fg_108dp_size)
-              densities = [
+              for dname, leg_sz, fg_sz in [
                   ('mipmap-mdpi', 48, 108),
                   ('mipmap-hdpi', 72, 162),
                   ('mipmap-xhdpi', 96, 216),
                   ('mipmap-xxhdpi', 144, 324),
                   ('mipmap-xxxhdpi', 192, 432),
-              ]
-              for dname, leg_sz, fg_sz in densities:
+              ]:
                   ddir = os.path.join(res_root, dname)
                   os.makedirs(ddir, exist_ok=True)
-
-                  # Legacy icons (full size)
-                  leg_img = src.resize((leg_sz, leg_sz), Image.LANCZOS)
-                  leg_img.save(os.path.join(ddir, 'ic_launcher.png'))
-                  leg_img.save(os.path.join(ddir, 'ic_launcher_round.png'))
-
-                  # Adaptive foreground: place icon cleanly inside the 66-68% safe zone of 108dp canvas
+                  src.resize((leg_sz, leg_sz), Image.LANCZOS).save(os.path.join(ddir, 'ic_launcher.png'))
+                  src.resize((leg_sz, leg_sz), Image.LANCZOS).save(os.path.join(ddir, 'ic_launcher_round.png'))
                   fg_canvas = Image.new('RGBA', (fg_sz, fg_sz), (px[0], px[1], px[2], 255))
                   inner_sz = int(round(fg_sz * 0.68))
                   inner_img = src.resize((inner_sz, inner_sz), Image.LANCZOS)
@@ -245,9 +118,6 @@ jobs:
                   fg_canvas.paste(inner_img, (offset, offset), inner_img)
                   fg_canvas.save(os.path.join(ddir, 'ic_launcher_foreground.png'))
 
-              print(f'Adaptive launcher icons generated cleanly (bg={bg_hex}, 68% safe-zone).')
-
-          # 2) Generate crisp white monochrome Fox vector status-bar notification icon (ic_stat_habitico.xml)
           drawable_dir = os.path.join(res_root, 'drawable')
           os.makedirs(drawable_dir, exist_ok=True)
           fox_vector_xml = '''<?xml version="1.0" encoding="utf-8"?>
@@ -264,18 +134,15 @@ jobs:
           '''
           with open(os.path.join(drawable_dir, 'ic_stat_habitico.xml'), 'w', encoding='utf-8') as f:
               f.write(fox_vector_xml)
-          print('White vector fox notification icon (ic_stat_habitico.xml) created cleanly.')
           PY
 
       - name: Build Android APK
-        if: steps.check_native.outputs.rebuild == 'true'
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
       - name: Rename & Upload Habitico APK
-        if: steps.check_native.outputs.rebuild == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: Habitico-APK
