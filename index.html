@@ -5733,9 +5733,9 @@ textarea:focus {
         <span>📿</span>
         <span>وقفة تجديد النية</span>
       </button>
-      <div class="overall-streak-box" title="الانضباط: الأيام المتتالية للالتزام بالدخول وتسجيل العادات ضمن مهلة الـ 48 ساعة">
+      <div class="overall-streak-box" onclick="openDisciplineChallengesPage()" style="cursor:pointer;" title="تحدي الانضباط الحالي — اضغط لعرض صفحة تحديات الانضباط">
         <span>🔥 الانضباط:</span>
-        <span id="overallStreakNum" style="font-size:1.25rem;">0</span>
+        <span id="overallStreakNum" style="font-size:1.18rem; direction:ltr; unicode-bidi:isolate;">0 / 1</span>
         <span>يوم</span>
       </div>
     </div>
@@ -6203,6 +6203,18 @@ textarea:focus {
 
     <!-- ==================== التاب الرابع الجديد: القوانين (tabRules) ==================== -->
     <section id="tabRules" class="tab-content">
+      <div class="stats-subnav-bar" id="rulesSubnavBar">
+        <button type="button" id="btnRulesSub_main" class="stats-subnav-btn active" onclick="switchRulesSubView('main')">
+          ⚖️ القوانين والعقوبات
+        </button>
+        <button type="button" id="btnRulesSub_fresh_start" class="stats-subnav-btn" onclick="switchRulesSubView('fresh_start')">
+          🌅 بداية جديدة
+        </button>
+      </div>
+
+      <div id="rulesFreshStartView" style="display:none;"></div>
+
+      <div id="rulesMainView">
       <!-- البطاقة الموحدة الوحيدة للقوانين (بنفس تصميم وألوان بطاقة القوانين المميزة) -->
       <div class="card special-rule-card">
         <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;">
@@ -6291,7 +6303,7 @@ textarea:focus {
           💡 <strong>الطريقة:</strong> في الجهاز الأول اضغط «تجهيز ونسخ الكود» وأرسله لنفسك (واتساب/ملاحظات). في الجهاز الثاني الصقه واضغط «استقبال ودمج». بعدها يظهر هناك كود جديد: انسخه وخذه للجهاز الأول واستقبله، فيتطابق الجهازان.
         </p>
       </div>
-
+      </div>
 
     </section>
 
@@ -6432,6 +6444,9 @@ textarea:focus {
         <button type="button" id="btnStatsSub_compass" class="stats-subnav-btn" onclick="switchStatsSubView('compass')">
           🧭 بوصلة التخطيط الذكي وخريطة المنهج
         </button>
+        <button type="button" id="btnStatsSub_challenges" class="stats-subnav-btn" onclick="switchStatsSubView('challenges')">
+          ⚔️ التحديات
+        </button>
         <button type="button" id="btnStatsSub_badges" class="stats-subnav-btn" onclick="switchStatsSubView('badges')">
           🏅 الأوسمة والألقاب
         </button>
@@ -6439,6 +6454,9 @@ textarea:focus {
 
       <!-- الشاشة الفرعية: بوصلة التخطيط الذكي وخريطة المنهج -->
       <div id="statsPlanningCompassView" style="display:none;"></div>
+
+      <!-- الشاشة الفرعية: تحديات الانضباط -->
+      <div id="statsChallengesView" style="display:none;"></div>
 
       <!-- الشاشة الفرعية الجديدة: الأوسمة والتحديات والخبرة والألقاب -->
       <div id="statsBadgesAndRanksView" style="display:none;"></div>
@@ -9714,7 +9732,12 @@ textarea:focus {
         headerBadge.innerHTML = `<span class="locked-date-badge">${isFutureStart ? '⏳ البداية المجدولة:' : '🔒 البداية:'} ${state.startDate}</span>`;
       }
 
-      document.getElementById('overallStreakNum').textContent = calculateOverallStreak();
+      const _curStreakVal = calculateOverallStreak();
+      const _dcStatus = (typeof syncDisciplineChallengesWithStreak === 'function') ? syncDisciplineChallengesWithStreak(_curStreakVal) : null;
+      const _streakEl = document.getElementById('overallStreakNum');
+      if (_streakEl) {
+        _streakEl.textContent = _dcStatus ? `${_curStreakVal} / ${_dcStatus.activeTargetDays}` : String(_curStreakVal);
+      }
 
       const yesterdayStr = addDays(sysToday, -1);
       const isBeforeStart = state.startDate && diffDays(state.startDate, sysToday) < 0;
@@ -10957,6 +10980,7 @@ textarea:focus {
       saveState();
       renderHabitsV2View();
       renderFastingPenaltyBanner();
+      if (typeof renderRulesSubView === 'function') renderRulesSubView();
       if (status === 'all_failed' || status === 'partial_resolved') {
         showAppToast(`✗ سُجّل عدم إتمام خطوة «${step.text}»${stepLoss > 0 ? ` وخُصم (−${stepLoss} HP)` : ''}، وحُسمت جميع خطوات العادة لليوم.`);
       } else {
@@ -13698,18 +13722,30 @@ textarea:focus {
       const generalView = document.getElementById('statsGeneralView');
       const detailView = document.getElementById('statsHabitDetailView');
       const compassView = document.getElementById('statsPlanningCompassView');
+      const challengesView = document.getElementById('statsChallengesView');
       const badgesView = document.getElementById('statsBadgesAndRanksView');
       const btnGen = document.getElementById('btnStatsSub_general');
       const btnComp = document.getElementById('btnStatsSub_compass');
+      const btnChal = document.getElementById('btnStatsSub_challenges');
       const btnBadges = document.getElementById('btnStatsSub_badges');
-      const subMode = (state.statsSubView === 'compass' || state.statsSubView === 'badges') ? state.statsSubView : 'general';
+      const subMode = (state.statsSubView === 'compass' || state.statsSubView === 'badges' || state.statsSubView === 'challenges') ? state.statsSubView : 'general';
       if (btnGen) btnGen.classList.toggle('active', subMode === 'general');
       if (btnComp) btnComp.classList.toggle('active', subMode === 'compass');
+      if (btnChal) btnChal.classList.toggle('active', subMode === 'challenges');
       if (btnBadges) btnBadges.classList.toggle('active', subMode === 'badges');
       try { renderPlanningCompassAnalytics(); } catch (e) { console.error(e); }
+      try { if (typeof renderDisciplineChallengesView === 'function') renderDisciplineChallengesView(); } catch (e) { console.error(e); }
       try { if (typeof renderBadgesAndRanksView === 'function') renderBadgesAndRanksView(); } catch (e) { console.error(e); }
       if (subMode === 'compass') {
         if (compassView) compassView.style.display = 'block';
+        if (challengesView) challengesView.style.display = 'none';
+        if (badgesView) badgesView.style.display = 'none';
+        if (generalView) generalView.style.display = 'none';
+        if (detailView) detailView.style.display = 'none';
+        return;
+      } else if (subMode === 'challenges') {
+        if (challengesView) challengesView.style.display = 'block';
+        if (compassView) compassView.style.display = 'none';
         if (badgesView) badgesView.style.display = 'none';
         if (generalView) generalView.style.display = 'none';
         if (detailView) detailView.style.display = 'none';
@@ -13717,11 +13753,13 @@ textarea:focus {
       } else if (subMode === 'badges') {
         if (badgesView) badgesView.style.display = 'block';
         if (compassView) compassView.style.display = 'none';
+        if (challengesView) challengesView.style.display = 'none';
         if (generalView) generalView.style.display = 'none';
         if (detailView) detailView.style.display = 'none';
         return;
       } else {
         if (compassView) compassView.style.display = 'none';
+        if (challengesView) challengesView.style.display = 'none';
         if (badgesView) badgesView.style.display = 'none';
       }
 
@@ -21650,9 +21688,16 @@ textarea:focus {
     // [NEW MODULE] 4. بوصلة التخطيط الذكي (Planning Analytics) وحساب متوسطات (التصنيف + نوع المهمة) بنافذة متحركة ذكية
     // ============================================================
     function switchStatsSubView(subKey) {
-      state.statsSubView = (subKey === 'compass' || subKey === 'badges') ? subKey : 'general';
+      state.statsSubView = (subKey === 'compass' || subKey === 'badges' || subKey === 'challenges') ? subKey : 'general';
       saveState();
       renderTab4();
+    }
+
+    function openDisciplineChallengesPage() {
+      state.statsSubView = 'challenges';
+      saveState();
+      const tabBtn = document.querySelector('.tab-btn[onclick*="tab4"]');
+      switchTab('tab4', tabBtn);
     }
 
     function openBadgesAndRanksPage() {
@@ -25164,10 +25209,13 @@ ${plan.leftoverSurplusMin >= 15 ? `
         (greenDays * 25) + (perfectGreenWeeks * 250) +
         completedDailyHabitsXp;
 
-      const totalXp = activityXp + badgesXp;
+      const rawTotalXp = activityXp + badgesXp;
+      const xpOffset = Math.max(0, Number(state.xpResetOffset) || 0);
+      const totalXp = Math.max(0, rawTotalXp - xpOffset);
       const rankInfo = getRankInfoFromTotalXp(totalXp);
 
       return {
+        rawTotalXp,
         totalStudyHours,
         maxSingleSessionMin,
         maxDailyStudyMin,
@@ -25381,6 +25429,342 @@ ${plan.leftoverSurplusMin >= 15 ? `
       if (statusKey !== null) ach.filterStatus = statusKey;
       saveState();
       renderBadgesAndRanksView();
+    }
+
+
+    // ============================================================
+    // [NEW MODULE] 1. بداية جديدة (داخل تاب القوانين) — تصفير آمن بلا مساس بالإحصائيات أو عداد الأمل
+    // ============================================================
+    function switchRulesSubView(subKey) {
+      state.rulesSubView = (subKey === 'fresh_start') ? 'fresh_start' : 'main';
+      saveState();
+      renderRulesSubView();
+    }
+
+    function renderRulesSubView() {
+      const mainView = document.getElementById('rulesMainView');
+      const freshView = document.getElementById('rulesFreshStartView');
+      const btnMain = document.getElementById('btnRulesSub_main');
+      const btnFresh = document.getElementById('btnRulesSub_fresh_start');
+      const mode = state.rulesSubView === 'fresh_start' ? 'fresh_start' : 'main';
+      if (btnMain) btnMain.classList.toggle('active', mode === 'main');
+      if (btnFresh) btnFresh.classList.toggle('active', mode === 'fresh_start');
+      if (mainView) mainView.style.display = mode === 'main' ? 'block' : 'none';
+      if (freshView) freshView.style.display = mode === 'fresh_start' ? 'block' : 'none';
+      renderFreshStartTabView();
+    }
+
+    function renderFreshStartTabView() {
+      const box = document.getElementById('rulesFreshStartView');
+      if (!box) return;
+      const usedCount = Math.max(0, Number(state.freshStartCount) || 0);
+      const isFreeNext = usedCount === 0;
+      const activePenaltiesCount = (state.fastingPenalties || []).filter(p => p && !p.completed && p.status !== 'completed' && p.status !== 'forgiven_fresh_start').length;
+      const curSun = getWeekSundayYMD(getSystemTodayYMD());
+      const curWeekTasksCount = (state.studyTasks || []).filter(t => t && t.weekSunday === curSun).length;
+      const nextSun = addDays(curSun, 7);
+      const nextWeekTasksCount = (state.studyTasks || []).filter(t => t && t.weekSunday === nextSun).length;
+
+      box.innerHTML = `
+        <div class="card" style="border:1.5px solid rgba(245,158,11,0.5); background:linear-gradient(145deg, rgba(245,158,11,0.08), rgba(139,92,246,0.08));">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <div>
+              <h3 style="margin:0; font-size:1.18rem; color:var(--amber-ink);">🌅 بداية جديدة (Fresh Start)</h3>
+              <p class="hint" style="margin:4px 0 0; line-height:1.65;">
+                إذا تعقّد الوضع وتراكمت الإخفاقات وأردت فتح صفحة بيضاء نظيفة بدون فقدان تاريخك أو إعداداتك، يمكنك تفعيل «بداية جديدة».
+              </p>
+            </div>
+            <span class="chip ${isFreeNext ? 'done' : ''}" style="font-size:0.78rem; font-weight:900; ${!isFreeNext ? 'background:rgba(239,68,68,0.14); color:#fca5a5; border:1px solid rgba(239,68,68,0.35);' : ''}">
+              ${isFreeNext ? '🎁 المرة الأولى مجانية (بلا عقوبة صيام)' : `🌙 المرة القادمة (#${usedCount + 1}) توجب عقوبة صيام`}
+            </span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:10px; margin-bottom:14px;">
+            <div style="background:var(--surface); border:1px solid rgba(239,68,68,0.35); border-radius:14px; padding:12px;">
+              <div style="font-weight:900; font-size:0.86rem; color:var(--danger); margin-bottom:6px;">🔄 ما سيُعاد ضبطه الآن:</div>
+              <ul style="margin:0; padding-inline-start:18px; font-size:0.8rem; line-height:1.8; color:var(--text);">
+                <li>تصفير عداد الانضباط (الستريك) وإعادة مرحلة الانضباط للمرحلة 1.</li>
+                <li>تصفير المتتبع الدائري لتحديد تاريخ بداية جديد ونسبة التزام أسبوعية جديدة.</li>
+                <li>تصفير نقاط الخبرة (XP) والرجوع للمستوى الأول (Lv 1) وإرجاع الـ HP إلى 100.</li>
+                <li>إلغاء العقوبات النشطة حالياً (${activePenaltiesCount}) مع إبقائها في السجل التاريخي.</li>
+                <li>حذف مهام الأسبوع الحالي فقط (${curWeekTasksCount} مهمة).</li>
+                <li><strong>${isFreeNext ? 'هذه أول مرة (مجانية بلا عقوبة صيام).' : 'يترتب على هذا التفعيل عقوبة صيام جديدة تلقائياً!'}</strong></li>
+              </ul>
+            </div>
+
+            <div style="background:var(--surface); border:1px solid rgba(16,185,129,0.4); border-radius:14px; padding:12px;">
+              <div style="font-weight:900; font-size:0.86rem; color:var(--green-ink); margin-bottom:6px;">🛡️ ما سيبقى محفوظاً 100% بلا أي تغيير:</div>
+              <ul style="margin:0; padding-inline-start:18px; font-size:0.8rem; line-height:1.8; color:var(--text);">
+                <li>التصنيفات المحفوظة وشجرة المنهج الطبي.</li>
+                <li>الإحصائيات السابقة وسجل ساعات المذاكرة والوسيط الإحصائي للمستشار الذكي.</li>
+                <li>تاريخ العقوبات والمخالفات السابقة بالكامل.</li>
+                <li>إعدادات Time Blocking (أوقات البلوكات والمهام والالتزامات المحفوظة فيها).</li>
+                <li>مهام الأسبوع التالي (${nextWeekTasksCount} مهمة).</li>
+                <li><strong>عداد الأمل (كل أيامه ومعاركه وأوسمته) لا يُمسّ أبداً.</strong></li>
+              </ul>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-top:10px; border-top:1px dashed var(--border);">
+            <span class="hint" style="font-size:0.76rem;">عدد مرات تفعيل البداية الجديدة سابقاً: <strong>${usedCount}</strong></span>
+            <button type="button" class="btn btn-primary" style="font-weight:900; padding:10px 20px; background:linear-gradient(135deg, #f59e0b, #d97706); border:none; color:#fff;" onclick="confirmAndTriggerFreshStart()">
+              🌅 تفعيل بداية جديدة الآن
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function executeFreshStartReset() {
+      const sysToday = getSystemTodayYMD();
+      const curSun = getWeekSundayYMD(sysToday);
+
+
+
+      const dc = ensureDisciplineChallengesState();
+      dc.activeIndex = dc.highestUnlockedIndex;
+      dc.lastObservedStreak = 0;
+      state.lastStreakResetDate = sysToday;
+      state.lastStreakResetTimestamp = Date.now();
+      state.checkinAfterReset = false;
+      state.disciplineStage = 1;
+      state.disciplineStageAck = { 1: true, 2: false, 3: false, 4: false };
+
+      state.logs = {};
+      state.checkinDays = {};
+      state.weeklyData = {};
+      state.startDate = null;
+      state.startDateLocked = false;
+      state.lastHpAuditDate = null;
+
+      if (typeof ensureHpState === 'function') ensureHpState();
+      state.weeklyHabitHp = 100;
+      state.weeklyHabitHpResetSunday = curSun;
+
+      if (Array.isArray(state.fastingPenalties)) {
+        state.fastingPenalties.forEach(p => {
+          if (p && !p.completed && p.status !== 'completed' && p.status !== 'forgiven_fresh_start') {
+            p.status = 'forgiven_fresh_start';
+            p.completed = true;
+            p.resolvedAt = sysToday;
+            p.note = 'أُلغيت ضمن بداية جديدة';
+          }
+        });
+      }
+
+      state.studyTasks = (state.studyTasks || []).filter(t => !t || t.weekSunday !== curSun);
+
+      // تصفير XP والرجوع للمستوى الأول بعد تحديث الحالة وتقييم الأوسمة بصمت (حتى يبقى الرصيد 0 XP / Lv 1 بدقة 100%)
+      try {
+        if (typeof evaluateBadgesAndXp === 'function') evaluateBadgesAndXp(false);
+        const curMetrics = (typeof computeUserLiveStatsForBadges === 'function') ? computeUserLiveStatsForBadges() : null;
+        if (curMetrics && typeof curMetrics.rawTotalXp === 'number') {
+          state.xpResetOffset = curMetrics.rawTotalXp;
+        }
+        const ach = (typeof ensureAchievementsState === 'function') ? ensureAchievementsState() : null;
+        if (ach) ach.highestLevelAck = 1;
+      } catch (e) {}
+
+      state.freshStartCount = (Number(state.freshStartCount) || 0) + 1;
+      const hasPenalty = state.freshStartCount >= 2;
+      if (hasPenalty && typeof ensureFastingPenaltyRecord === 'function') {
+        ensureFastingPenaltyRecord(curSun, `تفعيل زر «بداية جديدة» (المرة رقم ${state.freshStartCount})`);
+      }
+
+      saveState();
+      renderAll();
+
+      const tab1Btn = document.querySelector('.tab-btn[onclick*="tab1"]');
+      if (typeof switchTab === 'function') switchTab('tab1', tab1Btn);
+      if (typeof showAppToast === 'function') {
+        showAppToast(hasPenalty
+          ? `🌅 تم تفعيل «بداية جديدة» (#${state.freshStartCount}) وترتّبت عقوبة صيام — حدد تاريخ البداية الجديد الآن!`
+          : '🌅 تم تفعيل «بداية جديدة» (مجانية لأول مرة)! حدد تاريخ البداية الجديد ونسبة الالتزام الآن.'
+        );
+      }
+      return { freshStartCount: state.freshStartCount, hasPenalty };
+    }
+
+    function confirmAndTriggerFreshStart() {
+      const nextNum = (Number(state.freshStartCount) || 0) + 1;
+      const penText = nextNum === 1
+        ? '🎁 هذه هي المرة الأولى (مجانية — لن تترتب عليها عقوبة صيام).'
+        : `⚠️ تنبيه: هذه هي المرة رقم (${nextNum})، وستترتب عليها عقوبة صيام جديدة تلقائياً!`;
+      openAppConfirmDialog(
+        '🌅 تأكيد تفعيل «بداية جديدة»',
+        `هل أنت متأكد من بدء صفحة جديدة؟\n${penText}\n• سيُصفَّر عداد الانضباط والمتتبع الدائري والـ XP وتُحذف مهام الأسبوع الحالي فقط، وتُعاد الـ HP إلى 100 وتُلغى العقوبات النشطة.\n• ستبقى الإحصائيات والتصنيفات والوسيط وبلوكات الوقت ومهام الأسبوع القادم وعداد الأمل محفوظة بالكامل.`,
+        function() { executeFreshStartReset(); },
+        true
+      );
+    }
+
+    // ============================================================
+    // [NEW MODULE] 2. تحديات الانضباط (داخل الإحصائيات) + عداد الشعلة العلوي X / Y
+    // ============================================================
+    const DISCIPLINE_CHALLENGES = [
+      { id: 'dc_1',   days: 1,   emoji: '🌱', title: 'تحدي اليوم الأول',      desc: 'أشعل الشرارة الأولى وأتمم يوماً واحداً منضبطاً.' },
+      { id: 'dc_2',   days: 2,   emoji: '⚡', title: 'تحدي اليومين',          desc: 'أثبت أن البداية لم تكن صدفة — يومان متتاليان.' },
+      { id: 'dc_3',   days: 3,   emoji: '🔥', title: 'تحدي الـ 3 أيام',       desc: 'كسر حاجز التردد وبناء أول زخم حقيقي.' },
+      { id: 'dc_5',   days: 5,   emoji: '🛡️', title: 'تحدي الـ 5 أيام',       desc: 'خمسة أيام متواصلة من الالتزام والثبات.' },
+      { id: 'dc_7',   days: 7,   emoji: '🏆', title: 'تحدي الأسبوع الكامل',   desc: '7 أيام متتالية دون انقطاع أو مخالفة.' },
+      { id: 'dc_10',  days: 10,  emoji: '⚔️', title: 'تحدي العشرة الأوائل',   desc: '10 أيام متواصلة — دخول مرحلة الصلابة.' },
+      { id: 'dc_14',  days: 14,  emoji: '💎', title: 'تحدي الأسبوعين',        desc: '14 يوماً متتالياً من الانضباط الحقيقي.' },
+      { id: 'dc_21',  days: 21,  emoji: '🦅', title: 'تحدي عتبة العادة',      desc: '21 يوماً متتالية لترسيخ الهوية الجديدة.' },
+      { id: 'dc_30',  days: 30,  emoji: '👑', title: 'تحدي الشهر الكامل',     desc: '30 يوماً متتالياً من الثبات المستمر.' },
+      { id: 'dc_45',  days: 45,  emoji: '🌟', title: 'تحدي الـ 45 يوماً',     desc: 'نفس طويل يتجاوز الحماس المؤقت.' },
+      { id: 'dc_60',  days: 60,  emoji: '🏔️', title: 'تحدي الشهرين',          desc: '60 يوماً متواصلة من السيطرة التامة.' },
+      { id: 'dc_90',  days: 90,  emoji: '☀️', title: 'تحدي الربع الذهبي',     desc: '90 يوماً من الانضباط الصافي.' },
+      { id: 'dc_120', days: 120, emoji: '🔱', title: 'تحدي الـ 120 يوماً',    desc: 'أربعة أشهر متواصلة بلا سقوط.' },
+      { id: 'dc_180', days: 180, emoji: '🌌', title: 'تحدي نصف العام',        desc: '180 يوماً متتالياً — إرادة فولاذية.' },
+      { id: 'dc_365', days: 365, emoji: '🏅', title: 'تحدي العام الكامل',     desc: '365 يوماً متتالياً — أسطورة الانضباط.' }
+    ];
+
+    function ensureDisciplineChallengesState() {
+      if (!state.disciplineChallenges || typeof state.disciplineChallenges !== 'object') {
+        state.disciplineChallenges = {
+          completedIds: {},
+          highestUnlockedIndex: 0,
+          activeIndex: 0,
+          failedCount: 0,
+          lastFailedDate: null,
+          lastObservedStreak: 0
+        };
+      }
+      const dc = state.disciplineChallenges;
+      if (!dc.completedIds || typeof dc.completedIds !== 'object') dc.completedIds = {};
+      if (typeof dc.highestUnlockedIndex !== 'number' || dc.highestUnlockedIndex < 0) dc.highestUnlockedIndex = 0;
+      if (dc.highestUnlockedIndex >= DISCIPLINE_CHALLENGES.length) dc.highestUnlockedIndex = DISCIPLINE_CHALLENGES.length - 1;
+      if (typeof dc.activeIndex !== 'number' || dc.activeIndex < 0) dc.activeIndex = dc.highestUnlockedIndex;
+      if (dc.activeIndex >= DISCIPLINE_CHALLENGES.length) dc.activeIndex = DISCIPLINE_CHALLENGES.length - 1;
+      if (typeof dc.lastObservedStreak !== 'number') dc.lastObservedStreak = 0;
+      return dc;
+    }
+
+    function syncDisciplineChallengesWithStreak(curStreak) {
+      const dc = ensureDisciplineChallengesState();
+      const s = Math.max(0, Number(curStreak) || 0);
+      const sysToday = getSystemTodayYMD();
+      let changed = false;
+
+      if (s < dc.lastObservedStreak) {
+        dc.failedCount = (Number(dc.failedCount) || 0) + 1;
+        dc.lastFailedDate = sysToday;
+        dc.activeIndex = dc.highestUnlockedIndex;
+        changed = true;
+      }
+
+      while (dc.activeIndex < DISCIPLINE_CHALLENGES.length) {
+        const ch = DISCIPLINE_CHALLENGES[dc.activeIndex];
+        if (s >= ch.days) {
+          if (!dc.completedIds[ch.id]) {
+            dc.completedIds[ch.id] = { completedAt: sysToday };
+            changed = true;
+          }
+          if (dc.activeIndex + 1 < DISCIPLINE_CHALLENGES.length) {
+            dc.activeIndex += 1;
+            if (dc.activeIndex > dc.highestUnlockedIndex) {
+              dc.highestUnlockedIndex = dc.activeIndex;
+            }
+            changed = true;
+          } else {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+
+      if (dc.activeIndex < dc.highestUnlockedIndex) {
+        dc.activeIndex = dc.highestUnlockedIndex;
+        changed = true;
+      }
+
+      if (dc.lastObservedStreak !== s) {
+        dc.lastObservedStreak = s;
+        changed = true;
+      }
+
+      if (changed) saveState();
+
+      const activeCh = DISCIPLINE_CHALLENGES[Math.min(dc.activeIndex, DISCIPLINE_CHALLENGES.length - 1)];
+      const completedCount = Object.keys(dc.completedIds).length;
+      return {
+        curStreak: s,
+        activeChallenge: activeCh,
+        activeTargetDays: activeCh.days,
+        activeIndex: dc.activeIndex,
+        highestUnlockedIndex: dc.highestUnlockedIndex,
+        completedCount,
+        totalCount: DISCIPLINE_CHALLENGES.length,
+        failedCount: dc.failedCount || 0
+      };
+    }
+
+    function renderDisciplineChallengesView() {
+      const box = document.getElementById('statsChallengesView');
+      if (!box) return;
+      const curStreak = (typeof calculateOverallStreak === 'function') ? calculateOverallStreak() : 0;
+      const info = syncDisciplineChallengesWithStreak(curStreak);
+      const dc = ensureDisciplineChallengesState();
+      const ch = info.activeChallenge;
+      const pct = ch.days > 0 ? Math.min(100, Math.round((curStreak / ch.days) * 100)) : 0;
+      const remDays = Math.max(0, ch.days - curStreak);
+
+      box.innerHTML = `
+        <div class="card" style="background:linear-gradient(135deg, rgba(245,158,11,0.16), rgba(139,92,246,0.14)); border:1.5px solid rgba(245,158,11,0.45); margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="font-size:2.4rem; line-height:1;">${ch.emoji}</div>
+              <div>
+                <div style="font-size:0.75rem; font-weight:800; color:var(--amber-ink);">⚔️ التحدي النشط حالياً (${info.completedCount} / ${info.totalCount} مكتملة)</div>
+                <h3 style="margin:2px 0 0; font-size:1.15rem; font-weight:900;">${hbEsc(ch.title)}</h3>
+                <div class="hint" style="font-size:0.78rem; margin-top:2px;">${hbEsc(ch.desc)}</div>
+              </div>
+            </div>
+            <div style="text-align:end;">
+              <div style="font-size:1.35rem; font-weight:900; color:var(--amber-ink); direction:ltr; unicode-bidi:isolate;">🔥 ${curStreak} / ${ch.days}</div>
+              <div class="hint" style="font-size:0.74rem;">${remDays > 0 ? `متبقي ${remDays} يوم لإتمام التحدي` : '✅ تم إتمام كل التحديات!'}</div>
+            </div>
+          </div>
+          <div style="height:10px; border-radius:999px; background:rgba(148,163,184,0.22); overflow:hidden; margin-top:12px;">
+            <div style="height:100%; width:${pct}%; background:linear-gradient(90deg, #f59e0b, #ef4444, #8b5cf6); border-radius:999px; transition:width 0.35s ease;"></div>
+          </div>
+          <div class="hint" style="font-size:0.74rem; margin-top:8px;">
+            💡 عند مخالفة قانون أو انقطاع يومين متتاليين وتصفير الستريك، تعود محاولتك لبدء <strong>آخر تحدٍّ وصلت إليه (${hbEsc(ch.title)})</strong> بينما تبقى كل التحديات التي أتممتها سابقاً محفوظة كمكتملة.
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:10px;">
+          ${DISCIPLINE_CHALLENGES.map((item, idx) => {
+            const isDone = !!dc.completedIds[item.id];
+            const isActive = idx === info.activeIndex && !isDone;
+            const itemPct = isDone ? 100 : (isActive ? pct : 0);
+            const borderStyle = isDone
+              ? 'border:1.5px solid rgba(16,185,129,0.5); background:rgba(16,185,129,0.08);'
+              : (isActive ? 'border:1.5px solid rgba(245,158,11,0.65); background:rgba(245,158,11,0.08);' : 'border:1px solid var(--border); opacity:0.65;');
+            return `
+              <div class="card" style="margin:0; padding:12px 14px; ${borderStyle}">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.45rem;">${item.emoji}</span>
+                    <div>
+                      <div style="font-weight:900; font-size:0.9rem; color:var(--text);">${hbEsc(item.title)}</div>
+                      <div class="hint" style="font-size:0.72rem;">الهدف: ${item.days} ${item.days === 1 ? 'يوم' : (item.days === 2 ? 'يومان' : 'أيام')}</div>
+                    </div>
+                  </div>
+                  <span class="chip ${isDone ? 'done' : ''}" style="font-size:0.68rem; padding:2px 7px;">
+                    ${isDone ? '✅ مكتمل' : (isActive ? '⚔️ نشط' : '🔒 مقفل')}
+                  </span>
+                </div>
+                <div class="hint" style="font-size:0.74rem; line-height:1.5; margin-bottom:8px;">${hbEsc(item.desc)}</div>
+                <div style="height:6px; border-radius:999px; background:rgba(148,163,184,0.2); overflow:hidden;">
+                  <div style="height:100%; width:${itemPct}%; background:${isDone ? '#10b981' : '#f59e0b'}; border-radius:999px;"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
     }
 
     function renderBadgesAndRanksView() {
@@ -27468,7 +27852,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
         { key: 'branch_tab2',     icon: '📋', label: 'المهام والجوائز', branch: 'branch_tab2' },
         { key: 'tab1',            icon: '🎯', label: 'المتتبع الدائري', tabId: 'tab1' },
         { key: 'branch_hope',     icon: '🌱', label: 'عداد الأمل',     branch: 'branch_hope' },
-        { key: 'tabRules',        icon: '⚖️', label: 'القوانين',       tabId: 'tabRules' },
+        { key: 'branch_rules',    icon: '⚖️', label: 'القوانين',       branch: 'branch_rules' },
         { key: 'tab3',            icon: '💡', label: 'الملاحظات',      tabId: 'tab3' },
         { key: 'branch_tab4',     icon: '📊', label: 'الإحصائيات',     branch: 'branch_tab4' }
       ]
@@ -27530,13 +27914,22 @@ ${plan.leftoverSurplusMin >= 15 ? `
         { key: 'tasks_advisor',    icon: '🧭', label: 'المستشار الذكي',   tabId: 'tab2', subAction: () => { if (typeof switchTab2SubView === 'function') switchTab2SubView('tasks', document.querySelector('.tab2-subnav-btn[onclick*="tasks"]')); if (typeof switchTasksInnerSubPage === 'function') switchTasksInnerSubPage('advisor'); } }
       ]
     },
+    branch_rules: {
+      title: 'القوانين وبداية جديدة',
+      icon: '⚖️',
+      items: [
+        { key: 'rules_main',        icon: '⚖️', label: 'القوانين والعقوبات', tabId: 'tabRules', subAction: () => { if (typeof switchRulesSubView === 'function') switchRulesSubView('main'); } },
+        { key: 'rules_fresh_start', icon: '🌅', label: 'بداية جديدة',        tabId: 'tabRules', subAction: () => { if (typeof switchRulesSubView === 'function') switchRulesSubView('fresh_start'); } }
+      ]
+    },
     branch_tab4: {
       title: 'الإحصائيات والتقدم',
       icon: '📊',
       items: [
-        { key: 'stats_general', icon: '📊', label: 'الإحصائيات العامة', tabId: 'tab4', subAction: () => { if (typeof switchStatsSubView === 'function') switchStatsSubView('general'); } },
-        { key: 'stats_compass', icon: '🧭', label: 'بوصلة التخطيط',    tabId: 'tab4', subAction: () => { if (typeof switchStatsSubView === 'function') switchStatsSubView('compass'); } },
-        { key: 'stats_badges',  icon: '🏅', label: 'الأوسمة والألقاب',  tabId: 'tab4', subAction: () => { if (typeof switchStatsSubView === 'function') switchStatsSubView('badges'); } }
+        { key: 'stats_general',    icon: '📊', label: 'الإحصائيات العامة', tabId: 'tab4', subAction: () => { if (typeof switchStatsSubView === 'function') switchStatsSubView('general'); } },
+        { key: 'stats_compass',    icon: '🧭', label: 'بوصلة التخطيط',    tabId: 'tab4', subAction: () => { if (typeof switchStatsSubView === 'function') switchStatsSubView('compass'); } },
+        { key: 'stats_challenges', icon: '⚔️', label: 'تحديات الانضباط',  tabId: 'tab4', subAction: () => { if (typeof switchStatsSubView === 'function') switchStatsSubView('challenges'); } },
+        { key: 'stats_badges',     icon: '🏅', label: 'الأوسمة والألقاب',  tabId: 'tab4', subAction: () => { if (typeof switchStatsSubView === 'function') switchStatsSubView('badges'); } }
       ]
     }
   };
