@@ -2,6 +2,10 @@
   "appId": "com.salah.habitico",
   "appName": "Habitico",
   "webDir": "www",
+  "server": {
+    "url": "https://salah007-1.github.io/Habitico/",
+    "androidScheme": "https"
+  },
   "android": {
     "allowMixedContent": true
   },
@@ -10,10 +14,6 @@
       "smallIcon": "ic_stat_habitico",
       "iconColor": "#5b5bf0",
       "sound": "default"
-    },
-    "CapacitorUpdater": {
-      "autoUpdate": false,
-      "statsUrl": ""
     }
   }
 }

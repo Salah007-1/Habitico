@@ -25916,7 +25916,7 @@ ${plan.leftoverSurplusMin >= 15 ? `
   #fbUnsyncedTopBadge {
     display: none;
     position: fixed;
-    top: 10px;
+    top: calc(env(safe-area-inset-top, 0px) + 38px);
     left: 12px;
     z-index: 9760;
     background: linear-gradient(135deg, #4f46e5, #7c3aed);
@@ -26667,11 +26667,12 @@ ${plan.leftoverSurplusMin >= 15 ? `
   // Expose helpers for testing
   window.__hbSyncTest = { getCfg, getBackupsList, recordBackupSnapshot, pushToFirebaseManual, pullFromFirebaseManual, autoPullFromCloudIfClean };
 
-  // Register Service Worker for full offline PWA support (skip inside native Capacitor APK)
-  const isCapNative = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
-  if (!isCapNative && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  // Register Service Worker for instant live updates + persistent offline storage (works in both browser & Capacitor server.url)
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && location.hostname !== 'localhost') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        try { reg.update(); } catch (e) {}
+      }).catch(() => {});
     });
   }
 
@@ -28363,210 +28364,46 @@ ${plan.leftoverSurplusMin >= 15 ? `
 </script>
 
 
-<!-- Self-Hosted OTA Live Update Engine (Capacitor 6 + @capgo/capacitor-updater + GitHub Pages) -->
+<!-- Instant Live Update Engine (GitHub Pages + Persistent Service Worker Offline Cache) -->
 <script>
 (function() {
-  const OTA_VERSION_URLS = [
-    "https://raw.githubusercontent.com/Salah007-1/Habitico/main/ota/version.json",
-    "https://salah007-1.github.io/Habitico/ota/version.json"
-  ];
-  const OTA_HASH_KEY = "__habitico_ota_hash";
-  const OTA_VER_KEY = "__habitico_ota_version";
-  const OTA_LAST_CHECK_KEY = "__habitico_ota_last_check";
-  const MIN_CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-  let otaInFlight = false;
-
-  function getNativeUpdater() {
-    try {
-      if (window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform()) {
-        return (window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorUpdater) || null;
-      }
-    } catch (e) {}
-    return null;
-  }
-
-  // CRITICAL: Confirm bundle boot immediately so Capgo never triggers a false rollback
-  (function bootNotifyReady() {
-    const updater = getNativeUpdater();
-    if (updater && typeof updater.notifyAppReady === "function") {
-      try {
-        Promise.resolve(updater.notifyAppReady()).catch(function() {});
-      } catch (e) {}
-    }
-  })();
+  const LIVE_VER = "v22";
 
   function updateOtaUiLabel(customText) {
     const lbl = document.getElementById("hbOtaVersionLabel");
     if (!lbl) return;
-    if (customText) {
-      lbl.textContent = customText;
-      return;
-    }
-    const updater = getNativeUpdater();
-    const ver = localStorage.getItem(OTA_VER_KEY) || "النسخة المدمجة";
-    if (!updater) {
-      lbl.textContent = "نسخة المتصفح (تتحدث تلقائياً من الويب)";
-    } else {
-      lbl.textContent = "الإصدار المثبّت: " + ver;
-    }
-  }
-
-  async function resolveLocalOtaHash() {
-    const savedHash = localStorage.getItem(OTA_HASH_KEY);
-    if (savedHash) return savedHash;
-    try {
-      const res = await fetch("./ota-builtin-version.json", { cache: "no-store" });
-      if (res && res.ok) {
-        const meta = await res.json();
-        if (meta && meta.hash) {
-          localStorage.setItem(OTA_HASH_KEY, String(meta.hash));
-          if (meta.version) localStorage.setItem(OTA_VER_KEY, String(meta.version));
-          return String(meta.hash);
-        }
-      }
-    } catch (e) {}
-    return "";
-  }
-
-  async function cleanupOldOtaBundles(updater, keepId) {
-    try {
-      if (!updater || typeof updater.list !== "function" || typeof updater.delete !== "function") return;
-      const res = await updater.list();
-      const bundles = (res && Array.isArray(res.bundles)) ? res.bundles : [];
-      for (let i = 0; i < bundles.length; i++) {
-        const b = bundles[i];
-        if (b && b.id && b.id !== keepId && b.id !== "builtin") {
-          try { await updater.delete({ id: b.id }); } catch (e) {}
-        }
-      }
-    } catch (e) {}
+    if (customText) { lbl.textContent = customText; return; }
+    lbl.textContent = "الوضع المباشر (" + LIVE_VER + ") — يتحدث تلقائياً من GitHub ويعمل أوفلاين";
   }
 
   window.checkHabiticoOtaUpdate = async function(opts) {
     const manual = !!(opts && opts.manual);
-    const updater = getNativeUpdater();
     const toast = (msg) => { if (typeof showAppToast === "function") showAppToast(msg); };
-
-    if (!updater) {
-      updateOtaUiLabel();
-      if (manual) toast("🌐 أنت فاتح نسخة المتصفح؛ التحديث الهوائي (OTA) يعمل تلقائياً داخل تطبيق الأندرويد (APK).");
-      return { status: "not_native" };
-    }
-
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      if (manual) toast("📡 أنت حالياً أوفلاين — سيتحقق التطبيق من التحديث تلقائياً فور عودة الإنترنت.");
+      if (manual) toast("📡 أنت حالياً أوفلاين — سيتحدث التطبيق تلقائياً فور عودة الإنترنت.");
       return { status: "offline" };
     }
-
-    if (otaInFlight) {
-      if (manual) toast("⏳ جاري فحص أو تنزيل التحديث حالياً...");
-      return { status: "busy" };
-    }
-
-    if (!manual) {
-      const lastTs = Number(localStorage.getItem(OTA_LAST_CHECK_KEY) || "0");
-      if (Date.now() - lastTs < MIN_CHECK_INTERVAL_MS) {
-        updateOtaUiLabel();
-        return { status: "throttled" };
-      }
-    }
-
-    otaInFlight = true;
     const btn = document.getElementById("hbOtaCheckBtn");
-    if (btn && manual) { btn.disabled = true; btn.textContent = "⏳ جاري الفحص..."; }
-
+    if (btn && manual) { btn.disabled = true; btn.textContent = "⏳ جاري التحديث..."; }
     try {
-      localStorage.setItem(OTA_LAST_CHECK_KEY, String(Date.now()));
-      let remote = null;
-      let lastHttpCode = 0;
-      for (let uIdx = 0; uIdx < OTA_VERSION_URLS.length; uIdx++) {
-        try {
-          const r = await fetch(OTA_VERSION_URLS[uIdx] + "?t=" + Date.now(), { cache: "no-store" });
-          if (r && r.ok) {
-            remote = await r.json();
-            if (remote && remote.version && remote.url) break;
-          } else if (r) {
-            lastHttpCode = r.status;
-          }
-        } catch (e) {}
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) await reg.update();
       }
-      if (!remote) {
-        if (manual) toast("⚠️ تعذر الوصول لملف التحديث على GitHub (HTTP " + (lastHttpCode || "net") + ").");
-        return { status: "http_error", code: lastHttpCode };
+      if (manual) {
+        try { if (typeof saveState === "function") saveState(); } catch (e) {}
+        toast("🚀 جاري جلب أحدث نسخة من GitHub...");
+        setTimeout(function() { location.reload(); }, 400);
       }
-      if (!remote || !remote.version || !remote.url) {
-        if (manual) toast("⚠️ ملف التحديث غير مكتمل.");
-        return { status: "invalid_manifest" };
-      }
-
-      const localHash = await resolveLocalOtaHash();
-      const localVer = localStorage.getItem(OTA_VER_KEY) || "";
-      const remoteHash = String(remote.hash || remote.version);
-      const isNewer = localHash ? (remoteHash !== localHash) : (String(remote.version) !== localVer);
-
-      if (!isNewer) {
-        updateOtaUiLabel("محدّث لآخر إصدار (" + remote.version + ")");
-        if (manual) toast("✅ التطبيق على أحدث إصدار بالفعل (" + remote.version + ").");
-        return { status: "up_to_date", version: remote.version };
-      }
-
-      updateOtaUiLabel("⬇️ جاري تنزيل الإصدار " + remote.version + "...");
-      toast("⬇️ يوجد تحديث جديد للتطبيق (" + remote.version + ") — جاري التنزيل في الخلفية...");
-
-      const candidateUrls = [String(remote.url)];
-      if (remote.fallbackUrl && String(remote.fallbackUrl) !== String(remote.url)) {
-        candidateUrls.push(String(remote.fallbackUrl));
-      }
-      let bundle = null;
-      let lastDlErr = null;
-      for (let cIdx = 0; cIdx < candidateUrls.length; cIdx++) {
-        try {
-          bundle = await updater.download({
-            url: candidateUrls[cIdx],
-            version: String(remote.version)
-          });
-          if (bundle && bundle.id) break;
-        } catch (dlErr) {
-          lastDlErr = dlErr;
-        }
-      }
-      if (!bundle || !bundle.id) {
-        throw lastDlErr || new Error("Bundle download returned empty id");
-      }
-
-      if (!bundle || !bundle.id) {
-        throw new Error("Bundle download returned empty id");
-      }
-
-      // Persist state safely before switching bundle
-      try { if (typeof saveState === "function") saveState(); } catch (e) {}
-      localStorage.setItem(OTA_HASH_KEY, remoteHash);
-      localStorage.setItem(OTA_VER_KEY, String(remote.version));
-
-      await cleanupOldOtaBundles(updater, bundle.id);
-      updateOtaUiLabel("✨ جاري تطبيق الإصدار " + remote.version + "...");
-      toast("🚀 تم تنزيل التحديث بنجاح! جاري إعادة تشغيل التطبيق بالنسخة الجديدة...");
-
-      setTimeout(function() {
-        updater.set({ id: bundle.id }).catch(function(err) {
-          console.error("OTA set error:", err);
-        });
-      }, 600);
-
-      return { status: "updated", version: remote.version };
-    } catch (err) {
-      console.error("Habitico OTA update error:", err);
-      const errDetail = (err && (err.message || err.errorMessage)) ? String(err.message || err.errorMessage) : String(err || "unknown");
-      updateOtaUiLabel("خطأ بالتحديث: " + errDetail);
-      if (manual) toast("⚠️ تعذر تنزيل التحديث: " + errDetail);
-      return { status: "error", error: String(err && err.message || err) };
+      return { status: "checked" };
+    } catch (e) {
+      if (manual) toast("⚠️ تعذر التحقق من التحديث الآن — بياناتك بأمان.");
+      return { status: "error" };
     } finally {
-      otaInFlight = false;
       if (btn && manual) { btn.disabled = false; btn.textContent = "🔄 فحص التحديثات"; }
     }
   };
 
-  // Refresh version label whenever sync modal opens
   const origOpenFb = window.openFbSyncModal;
   if (typeof origOpenFb === "function") {
     window.openFbSyncModal = function() {
@@ -28575,37 +28412,8 @@ ${plan.leftoverSurplusMin >= 15 ? `
       return r;
     };
   }
-
-  // Silent background check 4s after launch & when returning to foreground
-  window.addEventListener("load", function() {
-    updateOtaUiLabel();
-    setTimeout(function() { window.checkHabiticoOtaUpdate({ manual: false }); }, 4000);
-  });
-  document.addEventListener("visibilitychange", function() {
-    if (!document.hidden) {
-      setTimeout(function() { window.checkHabiticoOtaUpdate({ manual: false }); }, 1500);
-    }
-  });
+  window.addEventListener("load", function() { updateOtaUiLabel(); });
 })();
 </script>
-
-
-<div id="habitTierClassifierModal" class="hb-modal-overlay" style="z-index:9700; display:none;" onclick="if(event.target===this) closeHabitTierClassifierModal()">
-  <div class="hb-modal" style="max-width:560px; width:94%; max-height:86vh; display:flex; flex-direction:column;">
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
-      <div>
-        <h3 style="margin:0; font-size:1.05rem;">🗂️ فرز العادات الدورية</h3>
-        <p class="hint" style="margin:2px 0 0; font-size:0.78rem;">اختر بضغطة واحدة لكل عادة: هل هي «مهما كان اليوم (MUST)» أم «العلو في منازل الجنة ومراتبها»؟</p>
-      </div>
-      <button type="button" class="btn btn-outline btn-sm" onclick="closeHabitTierClassifierModal()">✕</button>
-    </div>
-    <div id="habitTierClassifierCounts" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
-    <div id="habitTierClassifierList" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-bottom:6px;"></div>
-    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
-      <button type="button" class="btn btn-primary btn-sm" onclick="closeHabitTierClassifierModal(true)">✅ اعتماد التصنيف وإغلاق</button>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>

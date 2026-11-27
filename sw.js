@@ -1,65 +1,59 @@
-const CACHE_NAME = 'habitico-offline-v21';
+const CACHE_NAME = 'habitico-offline-v22';
 const APP_SHELL = [
   './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL).catch(() => cache.add('./index.html')))
+      .then((cache) => cache.addAll(APP_SHELL))
       .then(() => self.skipWaiting())
+      .catch(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      ))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
+
+function fetchWithTimeout(req, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    fetch(req, { cache: 'no-store' }).then((res) => {
+      clearTimeout(timer);
+      resolve(res);
+    }, (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  // Never intercept Firebase Realtime Database or cross-origin requests
-  if (url.origin !== self.location.origin || url.hostname.includes('firebasedatabase.app')) {
-    return;
-  }
+  if (url.origin !== self.location.origin) return;
 
-  // Network-first for HTML/navigation so updates load when online, cache fallback when offline
-  if (req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('.html')) {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(req).then((r) => r || caches.match('./index.html') || caches.match('./')))
-    );
-    return;
-  }
-
-  // Cache-first with network fallback for static local assets
+  // Network-First (3.5s timeout) so every GitHub update appears immediately,
+  // with instant fallback to persistent Service Worker cache when offline!
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
+    fetchWithTimeout(req, 3500)
+      .then((res) => {
         if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone)).catch(() => {});
         }
         return res;
-      });
-    })
+      })
+      .catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
   );
 });
